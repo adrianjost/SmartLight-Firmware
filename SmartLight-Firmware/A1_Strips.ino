@@ -23,7 +23,7 @@ void initStripAnalog(){
 void initStrip(){
   // set new color
   // "NeoPixel", "Analog RGB"
-  if(lamptype =="Analog RGB"){
+  if(std::string(lamptype) == std::string("Analog")){
     initStripAnalog();
   }else{
     initStripNeoPixel();
@@ -48,7 +48,7 @@ void setColorAnalog(RGB color){
 void setColor(RGB color){
   // set new color
   // "NeoPixel", "Analog RGB"
-  if(lamptype == "Analog RGB"){
+  if(std::string(lamptype) == std::string("Analog")){
     setColorAnalog(color);
   }else{
     setColorNeoPixel(color);
