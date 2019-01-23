@@ -3,7 +3,7 @@
 // Which pin on the ESP8266 is connected to the NeoPixels?
 #define NEO_PIN 2
 #define NEO_BRIGHTNESS 100
-#define NEO_PIXELS 1
+#define NEO_PIXELS 300
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
 /**********************************
@@ -23,7 +23,7 @@ void initStripAnalog(){
 void initStrip(){
   // set new color
   // "NeoPixel", "Analog RGB"
-  if(std::string(lamptype) == std::string("Analog")){
+  if(String(lamptype) == String("Analog")){
     initStripAnalog();
   }else{
     initStripNeoPixel();
@@ -48,7 +48,7 @@ void setColorAnalog(RGB color){
 void setColor(RGB color){
   // set new color
   // "NeoPixel", "Analog RGB"
-  if(std::string(lamptype) == std::string("Analog")){
+  if(String(lamptype) == String("Analog")){
     setColorAnalog(color);
   }else{
     setColorNeoPixel(color);

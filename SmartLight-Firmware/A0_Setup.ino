@@ -64,7 +64,9 @@ void setupWifi(){
 
   wm.addParameter(&setting_hostname);
   wm.addParameter(&setting_lamptype);
+
   setColor(RGB{55,0,55});
+
   if(!wm.autoConnect("SmartLight Setup", "LightItUp")){
     setColor(RGB{255,0,0});
     // shut down till the next reboot
