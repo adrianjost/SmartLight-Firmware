@@ -155,7 +155,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
               };
               (currentGradientTimes)[i] = tmpStateJson["gradient"]["transitionTimes"][i];
             }
-
             currentState = STATE_GRADIENT;
             hasNewValue = true;
           }else{
@@ -202,8 +201,6 @@ void loop() {
 
   if(currentState == STATE_GRADIENT){
     if(!gradientLoop(hasNewValue)){
-      setColor(RGB{r:255,g:255,b:255});
-      delay(1000);
       currentState = STATE_UNDEFINED;
     }
   }

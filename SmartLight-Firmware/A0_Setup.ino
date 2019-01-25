@@ -1,4 +1,4 @@
-#define configFilePath "/userconfig.json"
+#define configFilePath "config.json"
 #define JSON_HOSTNAME "hostname"
 #define JSON_LAMP_TYPE "lamptype"
 #define JSON_PINOUT "analogpinout"
