@@ -1,13 +1,15 @@
 #define configFilePath "/userconfig.json"
 #define JSON_HOSTNAME "hostname"
 #define JSON_LAMP_TYPE "lamptype"
-
+#define JSON_PINOUT "analogpinout"
 
 char hostname[32];
-char lamptype[32] = "NeoPixel"; // "NeoPixel", "Analog RGB"
+char lamptype[32]; // "NeoPixel", "Analog"
+char pinoutCharArray[4]; // RGB, BGR, ...
 
 WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
-WiFiManagerParameter setting_lamptype(JSON_LAMP_TYPE, "Type of connected lamp:<br /><span>Options: <code>NeoPixel</code>, <code>Analog RGB</code></span>", lamptype, 32);
+WiFiManagerParameter setting_lamptype(JSON_LAMP_TYPE, "Type of connected lamp:<br /><span>Options: <code>NeoPixel</code>, <code>Analog</code></span>", lamptype, 32);
+WiFiManagerParameter setting_pinout(JSON_PINOUT, "Pinout of Analog Wires:<br /><span>Options: <code>RGB</code>, <code>RBG</code>, ...</span>", pinoutCharArray, 4);
 
 void saveConfigCallback () {
   DynamicJsonBuffer jsonBuffer;
@@ -15,6 +17,7 @@ void saveConfigCallback () {
 
   json[JSON_HOSTNAME] = setting_hostname.getValue();
   json[JSON_LAMP_TYPE] = setting_lamptype.getValue();
+  json[JSON_PINOUT] = setting_pinout.getValue();
 
   File configFile = SPIFFS.open(configFilePath, "w");
   json.printTo(configFile);
@@ -49,6 +52,9 @@ void setupSpiffs(){
           if(json.containsKey(JSON_LAMP_TYPE)){
             strcpy(lamptype, json[JSON_LAMP_TYPE]);
           }
+          if(json.containsKey(JSON_PINOUT)){
+            strcpy(pinoutCharArray, json[JSON_PINOUT]);
+          }
         }
       }
     }
@@ -64,6 +70,7 @@ void setupWifi(){
 
   wm.addParameter(&setting_hostname);
   wm.addParameter(&setting_lamptype);
+  wm.addParameter(&setting_pinout);
 
   setColor(RGB{55,0,55});
 

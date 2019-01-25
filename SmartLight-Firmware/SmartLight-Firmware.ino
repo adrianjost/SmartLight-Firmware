@@ -95,11 +95,11 @@ byte currentState = STATE_UNDEFINED;
 bool hasNewValue = false;
 
 // currentState == STATE_COLOR
-RGB currentColor;
+RGB currentColor {0,0,0};
 
 // currentState == STATE_GRADIENT
 RGB *currentGradientColors; // create pointer where informations can be stored
-unsigned int *currentGradientTimes; // create pointer where informations can be stored
+unsigned long *currentGradientTimes; // create pointer where informations can be stored
 byte numberOfSteps;
 bool currentGradientLoop;
 
@@ -144,7 +144,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             free(currentGradientTimes);
             numberOfSteps = tmpStateJson["gradient"]["colors"].size();
             currentGradientColors = (RGB *) malloc(sizeof(RGB) * numberOfSteps);
-            currentGradientTimes = (unsigned int *) malloc(sizeof(unsigned int) * numberOfSteps);
+            currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long) * numberOfSteps);
 
             currentGradientLoop = tmpStateJson["gradient"]["loop"];
             for (int i = 0; i < numberOfSteps; i++) {
@@ -183,8 +183,8 @@ void setup() {
   setupWifi();
   setColor(RGB{0,0,0});
 
-  currentGradientColors = (RGB *) malloc(sizeof(RGB) * 1);
-  currentGradientTimes = (unsigned int *) malloc(sizeof(unsigned int) * 1);
+  currentGradientColors = (RGB *) malloc(sizeof(RGB));
+  currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long));
 
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
