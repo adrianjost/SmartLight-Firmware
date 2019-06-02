@@ -3,10 +3,10 @@
 // Which pin on the ESP8266 is connected to the NeoPixels?
 #define NEO_PIN 2
 #define NEO_BRIGHTNESS 100
-#define NEO_PIXELS 300
+#define NEO_PIXELS 100
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
-RGB analogPinout = {0,1,2};
+RGB analogPinout = {1,2,3};
 
 /**********************************
  INIT

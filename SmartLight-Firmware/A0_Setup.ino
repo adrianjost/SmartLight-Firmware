@@ -3,8 +3,8 @@
 #define JSON_LAMP_TYPE "lamptype"
 #define JSON_PINOUT "analogpinout"
 
-char hostname[32];
-char lamptype[32]; // "NeoPixel", "Analog"
+char hostname[32] = "A CHIP";
+char lamptype[32] = "NeoPixel"; // "NeoPixel", "Analog"
 char pinoutCharArray[4]; // RGB, BGR, ...
 
 WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
@@ -23,8 +23,9 @@ void saveConfigCallback () {
   json.printTo(configFile);
   configFile.close();
 
-  setColor(RGB{0,55,0});
+  setColor(GREEN);
   delay(1000);
+  setColor(BLACK);
   ESP.restart();
 }
 
@@ -72,14 +73,14 @@ void setupWifi(){
   wm.addParameter(&setting_lamptype);
   wm.addParameter(&setting_pinout);
 
-  setColor(RGB{55,0,55});
+  setColor(VIOLET);
 
   if(!wm.autoConnect("SmartLight Setup", "LightItUp")){
-    setColor(RGB{255,0,0});
+    setColor(RED);
     // shut down till the next reboot
     //ESP.deepSleep(86400000000); // 1 Day
     ESP.deepSleep(600000000); // 10 Minutes
     ESP.restart();
   }
-  setColor(RGB{55,55,55});
+  setColor(WHITE);
 }

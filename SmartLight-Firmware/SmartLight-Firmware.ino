@@ -19,6 +19,15 @@ Date: 16 December 2018
 #define STATE_COLOR 1
 #define STATE_GRADIENT 2
 
+// Debug colors
+#define BLACK RGB{0,0,0}
+#define WHITE RGB{55,55,55}
+#define RED RGB{55,0,0}
+#define GREEN RGB{0,55,0}
+#define BLUE RGB{0,0,55}
+#define ORANGE RGB{55,55,0}
+#define VIOLET RGB{55,0,55}
+
 /*
 API
 ===============================================================================
@@ -174,13 +183,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 //*************************
 
 void setup() {
-  setupSpiffs();
+  // setupSpiffs();
 
   initStrip();
 
-  setColor(RGB{0,0,55});
+  setColor(BLUE);
   setupWifi();
-  setColor(RGB{0,0,0});
+  setColor(BLACK);
 
   currentGradientColors = (RGB *) malloc(sizeof(RGB));
   currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long));
