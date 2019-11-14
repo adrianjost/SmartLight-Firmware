@@ -6,7 +6,7 @@
 #define NEO_PIXELS 100
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
-RGB analogPinout = {1,2,3};
+RGB analogPinout = {0,1,2};
 
 /**********************************
  INIT
@@ -21,17 +21,10 @@ void initStripAnalog(){
   pinMode(0,OUTPUT);
   pinMode(1,OUTPUT);
   pinMode(2,OUTPUT);
-
-       if(String(pinoutCharArray) == String("RBG")){ analogPinout = {0,2,1}; }
-  else if(String(pinoutCharArray) == String("GBR")){ analogPinout = {1,2,0}; }
-  else if(String(pinoutCharArray) == String("GRB")){ analogPinout = {1,0,2}; }
-  else if(String(pinoutCharArray) == String("BRG")){ analogPinout = {2,0,1}; }
-  else if(String(pinoutCharArray) == String("BGR")){ analogPinout = {2,1,0}; }
-  else{ analogPinout = {0,1,2}; }
 }
 void initStrip(){
   // set new color
-  // "NeoPixel", "Analog RGB"
+  // "NeoPixel", "Analog"
   if(String(lamptype) == String("Analog")){
     initStripAnalog();
   }else{
@@ -56,7 +49,7 @@ void setColorAnalog(RGB color){
 }
 void setColor(RGB color){
   // set new color
-  // "NeoPixel", "Analog RGB"
+  // "NeoPixel", "Analog"
   if(String(lamptype) == String("Analog")){
     setColorAnalog(color);
   }else{

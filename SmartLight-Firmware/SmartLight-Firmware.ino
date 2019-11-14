@@ -1,10 +1,10 @@
 /**
 Author: Adrian Jost
-Version: 0.2.1
-Date: 16 December 2018
+Version: 0.3.0
+Date: 14 November 2019
 **/
-#include <ArduinoJson.h>
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <WebSocketsServer.h>
 #include <Hash.h>
@@ -100,6 +100,12 @@ struct floatRGB {
 //*************************
 // global State
 //*************************
+
+char hostname[32] = "A CHIP";
+char lamptype[32] = "NeoPixel"; // "NeoPixel", "Analog"
+
+
+
 byte currentState = STATE_UNDEFINED;
 bool hasNewValue = false;
 
@@ -136,41 +142,44 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
         // deprecated case
           text = (text.substring(text.indexOf("J")+1, text.length()));
         }
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject &tmpStateJson = jsonBuffer.parseObject(text);
-        if (tmpStateJson.success()) {
-          if(tmpStateJson.containsKey("color")){
-            currentColor = {
-              tmpStateJson["color"]["r"],
-              tmpStateJson["color"]["g"],
-              tmpStateJson["color"]["b"]
-            };
-            currentState = STATE_COLOR;
-            hasNewValue = true;
-          }else if(tmpStateJson.containsKey("gradient")){
-            // TODO, copy gradient settings into global vars (& adjust dynamic array size)
-            free(currentGradientColors);
-            free(currentGradientTimes);
-            numberOfSteps = tmpStateJson["gradient"]["colors"].size();
-            currentGradientColors = (RGB *) malloc(sizeof(RGB) * numberOfSteps);
-            currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long) * numberOfSteps);
 
-            currentGradientLoop = tmpStateJson["gradient"]["loop"];
-            for (int i = 0; i < numberOfSteps; i++) {
-              (currentGradientColors)[i] = RGB {
-                tmpStateJson["gradient"]["colors"][i]["r"],
-                tmpStateJson["gradient"]["colors"][i]["g"],
-                tmpStateJson["gradient"]["colors"][i]["b"]
-              };
-              (currentGradientTimes)[i] = tmpStateJson["gradient"]["transitionTimes"][i];
-            }
-            currentState = STATE_GRADIENT;
-            hasNewValue = true;
-          }else{
-            currentState = STATE_UNDEFINED;
-          }
-        }else{
+        const size_t capacity = JSON_ARRAY_SIZE(10) + JSON_ARRAY_SIZE(10) + JSON_OBJECT_SIZE(2) + 10*JSON_OBJECT_SIZE(3) + 150;
+        DynamicJsonDocument tmpStateJson(capacity);
+        auto error = deserializeJson(tmpStateJson, text);
+
+        if (error) {
           // ERROR parsing State
+          currentState = STATE_UNDEFINED;
+          return;
+        }
+        if(tmpStateJson.containsKey("color")){
+          currentColor = {
+            tmpStateJson["color"]["r"],
+            tmpStateJson["color"]["g"],
+            tmpStateJson["color"]["b"]
+          };
+          currentState = STATE_COLOR;
+          hasNewValue = true;
+        }else if(tmpStateJson.containsKey("gradient")){
+          // TODO, copy gradient settings into global vars (& adjust dynamic array size)
+          free(currentGradientColors);
+          free(currentGradientTimes);
+          numberOfSteps = tmpStateJson["gradient"]["colors"].size();
+          currentGradientColors = (RGB *) malloc(sizeof(RGB) * numberOfSteps);
+          currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long) * numberOfSteps);
+
+          currentGradientLoop = tmpStateJson["gradient"]["loop"];
+          for (int i = 0; i < numberOfSteps; i++) {
+            (currentGradientColors)[i] = RGB {
+              tmpStateJson["gradient"]["colors"][i]["r"],
+              tmpStateJson["gradient"]["colors"][i]["g"],
+              tmpStateJson["gradient"]["colors"][i]["b"]
+            };
+            (currentGradientTimes)[i] = tmpStateJson["gradient"]["transitionTimes"][i];
+          }
+          currentState = STATE_GRADIENT;
+          hasNewValue = true;
+        }else{
           currentState = STATE_UNDEFINED;
         }
       }

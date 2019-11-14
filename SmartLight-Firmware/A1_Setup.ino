@@ -1,26 +1,19 @@
 #define configFilePath "config.json"
 #define JSON_HOSTNAME "hostname"
 #define JSON_LAMP_TYPE "lamptype"
-#define JSON_PINOUT "analogpinout"
-
-char hostname[32] = "A CHIP";
-char lamptype[32] = "NeoPixel"; // "NeoPixel", "Analog"
-char pinoutCharArray[4]; // RGB, BGR, ...
 
 WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
 WiFiManagerParameter setting_lamptype(JSON_LAMP_TYPE, "Type of connected lamp:<br /><span>Options: <code>NeoPixel</code>, <code>Analog</code></span>", lamptype, 32);
-WiFiManagerParameter setting_pinout(JSON_PINOUT, "Pinout of Analog Wires:<br /><span>Options: <code>RGB</code>, <code>RBG</code>, ...</span>", pinoutCharArray, 4);
 
 void saveConfigCallback () {
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& json = jsonBuffer.createObject();
+  const size_t capacity = JSON_OBJECT_SIZE(2);
+  DynamicJsonDocument doc(capacity);
 
-  json[JSON_HOSTNAME] = setting_hostname.getValue();
-  json[JSON_LAMP_TYPE] = setting_lamptype.getValue();
-  json[JSON_PINOUT] = setting_pinout.getValue();
+  doc[JSON_HOSTNAME] = setting_hostname.getValue();
+  doc[JSON_LAMP_TYPE] = setting_lamptype.getValue();
 
   File configFile = SPIFFS.open(configFilePath, "w");
-  json.printTo(configFile);
+  serializeJson(doc, configFile);
   configFile.close();
 
   setColor(GREEN);
@@ -43,19 +36,20 @@ void setupSpiffs(){
         std::unique_ptr<char[]> buf(new char[size]);
 
         configFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        if (json.success()) {
-          // copy from config to variable
-          if(json.containsKey(JSON_HOSTNAME)){
-            strcpy(hostname, json[JSON_HOSTNAME]);
-          }
-          if(json.containsKey(JSON_LAMP_TYPE)){
-            strcpy(lamptype, json[JSON_LAMP_TYPE]);
-          }
-          if(json.containsKey(JSON_PINOUT)){
-            strcpy(pinoutCharArray, json[JSON_PINOUT]);
-          }
+        
+        const size_t capacity = JSON_OBJECT_SIZE(2) + 70;
+        DynamicJsonDocument doc(capacity);
+
+        auto error = deserializeJson(doc, buf.get());
+        if(error){
+          return;
+        }
+        // copy from config to variable
+        if(doc.containsKey(JSON_HOSTNAME)){
+          strcpy(hostname, doc[JSON_HOSTNAME]);
+        }
+        if(doc.containsKey(JSON_LAMP_TYPE)){
+          strcpy(lamptype, doc[JSON_LAMP_TYPE]);
         }
       }
     }
@@ -71,7 +65,6 @@ void setupWifi(){
 
   wm.addParameter(&setting_hostname);
   wm.addParameter(&setting_lamptype);
-  wm.addParameter(&setting_pinout);
 
   setColor(VIOLET);
 
