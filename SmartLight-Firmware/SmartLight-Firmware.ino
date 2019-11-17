@@ -220,6 +220,7 @@ void blink(RGB color, int speed){
 }
 
 void setupSpiffs(){
+  // TODO remove color debug statements
   // initial values
   ("SmartLight-" + String(ESP.getChipId(), HEX)).toCharArray(hostname, 32);
   setColor(RED);
@@ -370,8 +371,6 @@ void gradientStep(){
   // transition done
   if(gradientState < (numberOfSteps - 1)){ // more transitions defined?
     // calculate next step
-    // TODO: check for array index out of range!
-    // TODO: global variables need to be defined and set.
     gradientState++;
     RGB startColor = currentGradientColors[gradientState - 1];
     RGB targetColor = currentGradientColors[gradientState];
@@ -381,6 +380,7 @@ void gradientStep(){
     gradientInitFade(duration, startColor, targetColor);
     return;
   }
+  // gradient should loop?
   if(currentGradientLoop){
     // restart gradient
     gradientState = 0;
@@ -422,7 +422,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
     case WStype_TEXT:{
         String text = String((char *) &payload[0]);
         if(text.startsWith("J")){
-        // deprecated case
+          // deprecated case
+          // handle it by converting it to the new syntax (removing leading "J")
           text = (text.substring(text.indexOf("J")+1, text.length()));
         }
 
@@ -444,7 +445,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           currentState = STATE_COLOR;
           hasNewValue = true;
         }else if(tmpStateJson.containsKey("gradient")){
-          // TODO, copy gradient settings into global vars (& adjust dynamic array size)
           free(currentGradientColors);
           free(currentGradientTimes);
           numberOfSteps = tmpStateJson["gradient"]["colors"].size();
@@ -500,13 +500,13 @@ void loop() {
   webSocket.loop(); // listen for websocket events
   if(currentState == STATE_COLOR){
     setColor(currentColor);
+    hasNewValue = false;
     currentState = STATE_UNDEFINED;
-  }
-
-  if(currentState == STATE_GRADIENT){
+  } else if(currentState == STATE_GRADIENT){
     if(!gradientLoop(hasNewValue)){
       currentState = STATE_UNDEFINED;
+    }else{
+        hasNewValue = false;
     }
   }
-  hasNewValue = false;
 }
