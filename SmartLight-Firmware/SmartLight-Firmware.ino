@@ -437,9 +437,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
         }
         if(tmpStateJson.containsKey("color")){
           currentColor = {
-            tmpStateJson["color"]["r"],
-            tmpStateJson["color"]["g"],
-            tmpStateJson["color"]["b"]
+            tmpStateJson["color"]["1"],
+            tmpStateJson["color"]["2"],
+            tmpStateJson["color"]["3"]
           };
           currentState = STATE_COLOR;
           hasNewValue = true;
@@ -454,9 +454,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           currentGradientLoop = tmpStateJson["gradient"]["loop"];
           for (int i = 0; i < numberOfSteps; i++) {
             (currentGradientColors)[i] = RGB {
-              tmpStateJson["gradient"]["colors"][i]["r"],
-              tmpStateJson["gradient"]["colors"][i]["g"],
-              tmpStateJson["gradient"]["colors"][i]["b"]
+              tmpStateJson["gradient"]["colors"][i]["1"],
+              tmpStateJson["gradient"]["colors"][i]["2"],
+              tmpStateJson["gradient"]["colors"][i]["3"]
             };
             (currentGradientTimes)[i] = tmpStateJson["gradient"]["transitionTimes"][i];
           }
