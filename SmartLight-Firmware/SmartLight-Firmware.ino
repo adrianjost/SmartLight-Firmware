@@ -373,7 +373,7 @@ void setupWifi(){
   setColor(GREEN);
 
   bool forceSetup = shouldEnterSetup();
-  // TODO [$5dfff60a7837000009b4b25b]: handle save callback for forced setup with no wifi setting changes.
+  // TODO [#13]: handle save callback for forced setup with no wifi setting changes.
   bool setup = forceSetup
     ? wm.startConfigPortal("SmartLight Setup", "LightItUp")
     : wm.autoConnect("SmartLight Setup", "LightItUp");
@@ -432,7 +432,7 @@ floatRGB gradientCalculateNewColor(unsigned long dx, floatRGB dy, floatRGB color
 
 //void fade(uint8_t num, unsigned long duration, RGB before, RGB after){
 void gradientInitFade(unsigned long duration, RGB before, RGB after){
-  // TODO [$5dfff60a7837000009b4b25c]: fix? handle millis overflow
+  // TODO [#14]: fix? handle millis overflow
   lastStepTime = millis();
   targetTime = lastStepTime + duration;
   timespan = duration;
