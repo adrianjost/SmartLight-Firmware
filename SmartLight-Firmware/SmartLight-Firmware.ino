@@ -7,7 +7,7 @@ Date: 22 December 2019
 #include <Arduino.h>
 #include <ArduinoJson.h> // 6.13.0 - Benoit Blanchon
 #include <ESP8266WiFi.h> // 1.0.0 - Ivan Grokhotkov
-#include <WebSocketsServer.h> // 0.4.13 - Gil Maimon
+#include <WebSocketsServer.h> // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
 #include <Hash.h> // 1.0.0 - Markus Sattler
 
 // WIFI-Manager
@@ -15,7 +15,7 @@ Date: 22 December 2019
 //Local WebServer used to serve the configuration portal
 //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 //Local DNS Server used for redirecting all requests to the configuration portal
-#include <DNSServer.h>
+#include <DNSServer.h> // 1.1.0 - Kristijan Novoselic
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix
 
@@ -232,62 +232,33 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 }
 
 void setupSpiffs(){
-  // TODO remove color debug statements
   // initial values
   ("SmartLight-" + String(ESP.getChipId(), HEX)).toCharArray(hostname, 32);
-  setColor(RED);
-  delay(1000);
-  if (SPIFFS.begin()) {
-    setColor(ORANGE);
-    delay(1000);
-    if (SPIFFS.exists(configFilePath)) {
-      setColor(GREEN);
-      delay(1000);
-      //file exists, reading and loading
-      File configFile = SPIFFS.open(configFilePath, "r");
-      if (configFile) {
-        setColor(BLUE);
-        delay(1000);
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
+  
+  if(!SPIFFS.begin()){ return; }
+  if(!SPIFFS.exists(configFilePath)) { return; }
+  
+  //file exists, reading and loading
+  File configFile = SPIFFS.open(configFilePath, "r");
+  
+  if(!configFile) { return; }
 
-      setColor(RED);
-      delay(1000);
-        configFile.readBytes(buf.get(), size);
+  size_t size = configFile.size();
+  // Allocate a buffer to store contents of the file.
+  std::unique_ptr<char[]> buf(new char[size]);
+  configFile.readBytes(buf.get(), size);
+  const size_t capacity = JSON_OBJECT_SIZE(2) + 60;
+  DynamicJsonDocument doc(capacity);
+  auto error = deserializeJson(doc, buf.get());
 
-      setColor(ORANGE);
-      delay(1000);
-        const size_t capacity = JSON_OBJECT_SIZE(2) + 60;
-        DynamicJsonDocument doc(capacity);
-      setColor(GREEN);
-      delay(1000);
-        auto error = deserializeJson(doc, buf.get());
-        if(error){
-          blink(RED, 500);
-          return;
-        }
-      setColor(BLUE);
-      delay(1000);
-        // copy from config to variable
-        if(doc.containsKey(JSON_HOSTNAME)){
-          setColor(RED);
-          delay(500);
-          strcpy(hostname, doc[JSON_HOSTNAME]);
-          setColor(GREEN);
-          delay(500);
-        }
-        if(doc.containsKey(JSON_LAMP_TYPE)){
-          setColor(RED);
-          delay(500);
-          strcpy(lamptype, doc[JSON_LAMP_TYPE]);
-          setColor(GREEN);
-          delay(500);
-        }
-        blink(BLUE, 500);
-      }
-      blink(ORANGE, 500);
-    }
+  if(error){ return; }
+
+  // copy from config to variable
+  if(doc.containsKey(JSON_HOSTNAME)){
+    strcpy(hostname, doc[JSON_HOSTNAME]);
+  }
+  if(doc.containsKey(JSON_LAMP_TYPE)){
+    strcpy(lamptype, doc[JSON_LAMP_TYPE]);
   }
 }
 
@@ -514,12 +485,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 //*************************
 
 void setup() {
-  
-  initStrip();
 
-  // blink(WHITE, 500);
-  // TODO Spiffs before initStrip
-  // setupSpiffs();
+  setupSpiffs();
+
+  initStrip();
 
   setColor(BLUE);
   setupWifi();
