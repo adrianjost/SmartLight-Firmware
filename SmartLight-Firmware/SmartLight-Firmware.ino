@@ -445,6 +445,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           currentState = STATE_COLOR;
           hasNewValue = true;
         }else if(tmpStateJson.containsKey("gradient")){
+          gradientState = 0;
+          targetTime = millis();
           free(currentGradientColors);
           free(currentGradientTimes);
           numberOfSteps = tmpStateJson["gradient"]["colors"].size();
