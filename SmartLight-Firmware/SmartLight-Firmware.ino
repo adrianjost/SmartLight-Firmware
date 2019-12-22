@@ -223,6 +223,10 @@ void saveConfigCallback () {
   ESP.restart();
 }
 
+void configModeCallback (WiFiManager *myWiFiManager) {
+  setColor(VIOLET);
+}
+
 void setupSpiffs(){
   // TODO remove color debug statements
   // initial values
@@ -294,6 +298,7 @@ bool shouldEnterSetup(){
     if(buttonState == LOW){
       click_count++;
       if(click_count >= clickThreshould){
+        setColor(VIOLET);
         return true;
       }
     } else {
@@ -309,12 +314,13 @@ void setupWifi(){
   wm.setDebugOutput(false);
   wm.setTimeout(300);
   wm.setSaveConfigCallback(saveConfigCallback);
+  wm.setAPCallback(configModeCallback);
   wm.setHostname(hostname);
 
   wm.addParameter(&setting_hostname);
   wm.addParameter(&setting_lamptype);
 
-  setColor(VIOLET);
+  setColor(GREEN);
 
   bool forceSetup = shouldEnterSetup();
   bool setup = forceSetup
