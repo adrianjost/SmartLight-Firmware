@@ -17,7 +17,7 @@ Date: 22 December 2019
 //Local DNS Server used for redirecting all requests to the configuration portal
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix     
+#include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix
 
 // LED Strips
 #include <Adafruit_NeoPixel.h> // 1.3.1 Adafruit
