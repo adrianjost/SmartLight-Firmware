@@ -22,6 +22,9 @@ Date: 22 December 2019
 // LED Strips
 #include <Adafruit_NeoPixel.h> // 1.3.1 Adafruit
 
+// comment in for serial debugging
+// #define DEBUG
+
 // PIN DEFINITIONS
 #define PIN_RESET 0
 #define PIN_NEO 2
@@ -108,7 +111,6 @@ To make this transition smooth your gradient should start and end with the same 
 ===============================================================================
 */
 
-
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 
 WebSocketsServer webSocket = WebSocketsServer(80);
@@ -155,12 +157,17 @@ void initStripNeoPixel(){
   pixels.show();
 }
 void initStripAnalog(){
-  pinMode(PIN_RESET, INPUT);
   pinMode(PIN_CH1, OUTPUT);
   pinMode(PIN_CH2, OUTPUT);
   pinMode(PIN_CH3, OUTPUT);
 }
 void initStrip(){
+  #ifdef DEBUG
+    Serial.println("initStrip");
+    Serial.println(String(lamptype));
+    return;
+  #endif
+
   // set new color
   // "NeoPixel", "Analog"
   if(String(lamptype) == String("Analog")){
@@ -186,6 +193,17 @@ void setColorAnalog(RGB color){
   analogWrite(PIN_CH3, map(color.b,0,255,0,1024));
 }
 void setColor(RGB color){
+  #ifdef DEBUG
+    Serial.print("setColor: ");
+    Serial.print(color.r);
+    Serial.print(", ");
+    Serial.print(color.g);
+    Serial.print(", ");
+    Serial.print(color.b);
+    Serial.println("");
+    return;
+  #endif
+
   // set new color
   // "NeoPixel", "Analog"
   if(String(lamptype) == String("Analog")){
@@ -232,16 +250,35 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 }
 
 void setupSpiffs(){
+  #ifdef DEBUG
+    Serial.println("setupSpiffs");
+  #endif
+
   // initial values
   ("SmartLight-" + String(ESP.getChipId(), HEX)).toCharArray(hostname, 32);
-  
+
+  #ifdef DEBUG
+    Serial.print("hostname: ");
+    Serial.println(hostname);
+    Serial.print("lamptype: ");
+    Serial.println(lamptype);
+  #endif
+
   if(!SPIFFS.begin()){ return; }
+  #ifdef DEBUG
+    Serial.println("SPIFFS works");
+  #endif
   if(!SPIFFS.exists(configFilePath)) { return; }
+  #ifdef DEBUG
+    Serial.println("SPIFFS configfile exists");
+  #endif
   
   //file exists, reading and loading
   File configFile = SPIFFS.open(configFilePath, "r");
-  
   if(!configFile) { return; }
+  #ifdef DEBUG
+    Serial.println("configfile read");
+  #endif
 
   size_t size = configFile.size();
   // Allocate a buffer to store contents of the file.
@@ -250,19 +287,35 @@ void setupSpiffs(){
   const size_t capacity = JSON_OBJECT_SIZE(2) + 60;
   DynamicJsonDocument doc(capacity);
   auto error = deserializeJson(doc, buf.get());
-
   if(error){ return; }
+
+  #ifdef DEBUG
+    Serial.println("configfile serialized");
+  #endif
 
   // copy from config to variable
   if(doc.containsKey(JSON_HOSTNAME)){
+    #ifdef DEBUG
+      Serial.println("JSON_HOSTNAME key read");
+    #endif
     strcpy(hostname, doc[JSON_HOSTNAME]);
+    #ifdef DEBUG
+      Serial.println("hostname updated");
+    #endif
   }
   if(doc.containsKey(JSON_LAMP_TYPE)){
+    #ifdef DEBUG
+      Serial.println("JSON_LAMP_TYPE key read");
+    #endif
     strcpy(lamptype, doc[JSON_LAMP_TYPE]);
+    #ifdef DEBUG
+      Serial.println("lamptype updated");
+    #endif
   }
 }
 
 bool shouldEnterSetup(){
+  pinMode(PIN_RESET, INPUT);
   byte clickThreshould = 5;
   int timeSlot = 5000;
   byte readingsPerSecond = 10;
@@ -485,8 +538,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 //*************************
 
 void setup() {
+  #ifdef DEBUG
+    Serial.begin(115200);
+    Serial.println("STARTED IN DEBUG MODE");
+  #endif
+  
+  // setupSpiffs();
 
-  setupSpiffs();
+  #ifdef DEBUG
+    Serial.println("setupSpiffs finished");
+  #endif
 
   initStrip();
 
