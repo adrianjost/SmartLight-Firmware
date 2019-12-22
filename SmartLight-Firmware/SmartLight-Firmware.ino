@@ -4,23 +4,23 @@ Version: 0.3.0
 Date: 22 December 2019
 **/
 
-#include <ArduinoJson.h> // 6.13.0 - Benoit Blanchon
-#include <ESP8266WiFi.h> // 1.0.0 - Ivan Grokhotkov
-#include <WebSocketsServer.h> // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
-#include <Hash.h> // 1.0.0 - Markus Sattler
+#include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
+#include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
+#include <WebSocketsServer.h>   // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
+#include <Hash.h>               // 1.0.0 - Markus Sattler
 
 // WIFI-Manager
 //Local WebServer used to serve the configuration portal
 //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 //Local DNS Server used for redirecting all requests to the configuration portal
-#include <DNSServer.h> // 1.1.0 - Kristijan Novoselic
+#include <DNSServer.h>          // 1.1.0 - Kristijan Novoselic
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
+#include <WiFiManager.h>        // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
 #include <FS.h>
 #include <LittleFS.h>
 
 // LED Strips
-#include <Adafruit_NeoPixel.h> // 1.3.1 Adafruit
+#include <Adafruit_NeoPixel.h>  // 1.3.1 Adafruit
 
 // comment in for serial debugging
 // #define DEBUG
@@ -247,7 +247,7 @@ void saveConfigCallback () {
   #ifdef DEBUG
     Serial.println("config written to filesystem");
   #endif
-  
+
   setColor(GREEN);
   delay(1000);
   setColor(BLACK);
@@ -283,12 +283,12 @@ void setupFilesystem(){
   #ifdef DEBUG
     Serial.println("filesystem->begin() executed");
   #endif
-  
+
   if(!filesystem->exists(configFilePath)) {
     #ifdef DEBUG
       Serial.println("config file doesn't exist");
     #endif
-    return; 
+    return;
   }
   #ifdef DEBUG
     Serial.println("configfile exists");
@@ -342,7 +342,7 @@ bool shouldEnterSetup(){
   int timeSlot = 5000;
   byte readingsPerSecond = 10;
   byte click_count = 0;
-  
+
   for(int i=0; i < (timeSlot / readingsPerSecond / 10); i++){
     byte buttonState = digitalRead(PIN_RESET);
     if(buttonState == LOW){
@@ -373,8 +373,9 @@ void setupWifi(){
   setColor(GREEN);
 
   bool forceSetup = shouldEnterSetup();
+  // TODO: handle save callback for forced setup with no wifi setting changes.
   bool setup = forceSetup
-    ? wm.startConfigPortal("SmartLight Setup", "LightItUp") 
+    ? wm.startConfigPortal("SmartLight Setup", "LightItUp")
     : wm.autoConnect("SmartLight Setup", "LightItUp");
   if(!setup){
     setColor(RED);
@@ -431,7 +432,7 @@ floatRGB gradientCalculateNewColor(unsigned long dx, floatRGB dy, floatRGB color
 
 //void fade(uint8_t num, unsigned long duration, RGB before, RGB after){
 void gradientInitFade(unsigned long duration, RGB before, RGB after){
-  // TODO FIX ? handle millis overflow
+  // TODO: fix? handle millis overflow
   lastStepTime = millis();
   targetTime = lastStepTime + duration;
   timespan = duration;
@@ -449,7 +450,7 @@ void gradientInitFade(unsigned long duration, RGB before, RGB after){
 
 void gradientStep(){
   // breakpoint not reached -> continue fading
-  if (lastStepTime < targetTime){ // TODO FIX ? handle millis overflow
+  if (lastStepTime < targetTime){ // TODO: fix? handle millis overflow
     unsigned long currentTime = millis();
     unsigned long dx = currentTime - lastStepTime;
     lastStepTime = currentTime;
@@ -566,7 +567,7 @@ void setup() {
     Serial.setDebugOutput(true);
     Serial.println("STARTED IN DEBUG MODE");
   #endif
-  
+
   setupFilesystem();
 
   #ifdef DEBUG
