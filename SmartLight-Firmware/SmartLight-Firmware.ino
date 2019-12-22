@@ -21,9 +21,9 @@ Date: 14 November 2019
 // PIN DEFINITIONS
 #define PIN_RESET 0
 #define PIN_NEO 2
-#define PIN_CH-1 1
-#define PIN_CH-2 2
-#define PIN_CH-3 3
+#define PIN_CH1 1
+#define PIN_CH2 2
+#define PIN_CH3 3
 
 // NeoPixel settings
 #define NEO_BRIGHTNESS 100
@@ -151,10 +151,10 @@ void initStripNeoPixel(){
   pixels.show();
 }
 void initStripAnalog(){
-  pinMode(PIN_RESET, OUTPUT);
-  pinMode(PIN_CH-1, OUTPUT);
-  pinMode(PIN_CH-2, OUTPUT);
-  pinMode(PIN_CH-3, OUTPUT);
+  pinMode(PIN_RESET, INPUT);
+  pinMode(PIN_CH1, OUTPUT);
+  pinMode(PIN_CH2, OUTPUT);
+  pinMode(PIN_CH3, OUTPUT);
 }
 void initStrip(){
   // set new color
@@ -177,9 +177,9 @@ void setColorNeoPixel(RGB color){
   pixels.show();
 }
 void setColorAnalog(RGB color){
-  analogWrite(PIN_CH-1, map(color.r,0,255,0,1024));
-  analogWrite(PIN_CH-2, map(color.g,0,255,0,1024));
-  analogWrite(PIN_CH-3, map(color.b,0,255,0,1024));
+  analogWrite(PIN_CH1, map(color.r,0,255,0,1024));
+  analogWrite(PIN_CH2, map(color.g,0,255,0,1024));
+  analogWrite(PIN_CH3, map(color.b,0,255,0,1024));
 }
 void setColor(RGB color){
   // set new color
@@ -188,6 +188,14 @@ void setColor(RGB color){
     setColorAnalog(color);
   }else{
     setColorNeoPixel(color);
+  }
+}
+void blink(RGB color, int speed){
+  while(true){
+    setColor(color);
+    delay(speed);
+    setColor(BLACK);
+    delay(speed);
   }
 }
 
@@ -213,15 +221,6 @@ void saveConfigCallback () {
   delay(1000);
   setColor(BLACK);
   ESP.restart();
-}
-
-void blink(RGB color, int speed){
-  while(true){
-    setColor(color);
-    delay(speed);
-    setColor(BLACK);
-    delay(speed);
-  }
 }
 
 void setupSpiffs(){
@@ -284,6 +283,27 @@ void setupSpiffs(){
   }
 }
 
+bool shouldEnterSetup(){
+  byte clickThreshould = 5;
+  int timeSlot = 5000;
+  byte readingsPerSecond = 10;
+  byte click_count = 0;
+  
+  for(int i=0; i < (timeSlot / readingsPerSecond / 10); i++){
+    byte buttonState = digitalRead(PIN_RESET);
+    if(buttonState == LOW){
+      click_count++;
+      if(click_count >= clickThreshould){
+        return true;
+      }
+    } else {
+      click_count = 0;
+    }
+    delay(1000 / readingsPerSecond);
+  }
+  return false;
+}
+
 void setupWifi(){
   WiFiManager wm;
   wm.setDebugOutput(false);
@@ -296,11 +316,18 @@ void setupWifi(){
 
   setColor(VIOLET);
 
-  if(!wm.autoConnect("SmartLight Setup", "LightItUp")){
+  bool forceSetup = shouldEnterSetup();
+  bool setup = forceSetup
+    ? wm.startConfigPortal("SmartLight Setup", "LightItUp") 
+    : wm.autoConnect("SmartLight Setup", "LightItUp");
+  if(!setup){
     setColor(RED);
     // shut down till the next reboot
     //ESP.deepSleep(86400000000); // 1 Day
     ESP.deepSleep(600000000); // 10 Minutes
+    ESP.restart();
+  }
+  if(forceSetup){
     ESP.restart();
   }
 }
