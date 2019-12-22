@@ -18,8 +18,14 @@ Date: 14 November 2019
 // LED Strips
 #include <Adafruit_NeoPixel.h>
 
-// Which pin on the ESP8266 is connected to the NeoPixels?
-#define NEO_PIN 2
+// PIN DEFINITIONS
+#define PIN_RESET 0
+#define PIN_NEO 2
+#define PIN_CH1 1
+#define PIN_CH2 2
+#define PIN_CH3 3
+
+// NeoPixel settings
 #define NEO_BRIGHTNESS 100
 #define NEO_PIXELS 100
 
@@ -52,9 +58,9 @@ Examples:
 send:
   {
     color: {
-      r: 255,
-      g: 100,
-      b: 0
+      1: 255,
+      2: 100,
+      3: 0
     }
   }
 
@@ -64,19 +70,19 @@ send:
     gradient: {
       colors: [
         {
-          r: 255,
-          g: 0,
-          b: 0
+          1: 255,
+          2: 0,
+          3: 0
         },
         {
-          r: 0,
-          g: 0,
-          b: 255
+          1: 0,
+          2: 0,
+          3: 255
         },
         {
-          r: 255,
-          g: 0,
-          b: 0
+          1: 255,
+          2: 0,
+          3: 0
         }
       ],
       transitionTimes: [0, 10000, 20000], // check 2.1
@@ -99,7 +105,7 @@ To make this transition smooth your gradient should start and end with the same 
 */
 
 
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 
 WebSocketsServer webSocket = WebSocketsServer(80);
 
@@ -114,8 +120,6 @@ struct floatRGB {
   float g;
   float b;
 };
-
-RGB analogPinout = {1,2,3};
 
 
 //*************************
@@ -147,9 +151,10 @@ void initStripNeoPixel(){
   pixels.show();
 }
 void initStripAnalog(){
-  pinMode(analogPinout.r, OUTPUT);
-  pinMode(analogPinout.g, OUTPUT);
-  pinMode(analogPinout.b, OUTPUT);
+  pinMode(PIN_RESET, INPUT);
+  pinMode(PIN_CH1, OUTPUT);
+  pinMode(PIN_CH2, OUTPUT);
+  pinMode(PIN_CH3, OUTPUT);
 }
 void initStrip(){
   // set new color
@@ -172,9 +177,9 @@ void setColorNeoPixel(RGB color){
   pixels.show();
 }
 void setColorAnalog(RGB color){
-  analogWrite(analogPinout.r, map(color.r,0,255,0,1024));
-  analogWrite(analogPinout.g, map(color.g,0,255,0,1024));
-  analogWrite(analogPinout.b, map(color.b,0,255,0,1024));
+  analogWrite(PIN_CH1, map(color.r,0,255,0,1024));
+  analogWrite(PIN_CH2, map(color.g,0,255,0,1024));
+  analogWrite(PIN_CH3, map(color.b,0,255,0,1024));
 }
 void setColor(RGB color){
   // set new color
@@ -183,6 +188,14 @@ void setColor(RGB color){
     setColorAnalog(color);
   }else{
     setColorNeoPixel(color);
+  }
+}
+void blink(RGB color, int speed){
+  while(true){
+    setColor(color);
+    delay(speed);
+    setColor(BLACK);
+    delay(speed);
   }
 }
 
@@ -210,13 +223,8 @@ void saveConfigCallback () {
   ESP.restart();
 }
 
-void blink(RGB color, int speed){
-  while(true){
-    setColor(color);
-    delay(speed);
-    setColor(BLACK);
-    delay(speed);
-  }
+void configModeCallback (WiFiManager *myWiFiManager) {
+  setColor(VIOLET);
 }
 
 void setupSpiffs(){
@@ -279,23 +287,53 @@ void setupSpiffs(){
   }
 }
 
+bool shouldEnterSetup(){
+  byte clickThreshould = 5;
+  int timeSlot = 5000;
+  byte readingsPerSecond = 10;
+  byte click_count = 0;
+  
+  for(int i=0; i < (timeSlot / readingsPerSecond / 10); i++){
+    byte buttonState = digitalRead(PIN_RESET);
+    if(buttonState == LOW){
+      click_count++;
+      if(click_count >= clickThreshould){
+        setColor(VIOLET);
+        return true;
+      }
+    } else {
+      click_count = 0;
+    }
+    delay(1000 / readingsPerSecond);
+  }
+  return false;
+}
+
 void setupWifi(){
   WiFiManager wm;
   wm.setDebugOutput(false);
   wm.setTimeout(300);
   wm.setSaveConfigCallback(saveConfigCallback);
+  wm.setAPCallback(configModeCallback);
   wm.setHostname(hostname);
 
   wm.addParameter(&setting_hostname);
   wm.addParameter(&setting_lamptype);
 
-  setColor(VIOLET);
+  setColor(GREEN);
 
-  if(!wm.autoConnect("SmartLight Setup", "LightItUp")){
+  bool forceSetup = shouldEnterSetup();
+  bool setup = forceSetup
+    ? wm.startConfigPortal("SmartLight Setup", "LightItUp") 
+    : wm.autoConnect("SmartLight Setup", "LightItUp");
+  if(!setup){
     setColor(RED);
     // shut down till the next reboot
     //ESP.deepSleep(86400000000); // 1 Day
     ESP.deepSleep(600000000); // 10 Minutes
+    ESP.restart();
+  }
+  if(forceSetup){
     ESP.restart();
   }
 }
