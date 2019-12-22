@@ -1,22 +1,27 @@
 /**
 Author: Adrian Jost
 Version: 0.3.0
-Date: 14 November 2019
+Date: 22 December 2019
 **/
+
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include <ESP8266WiFi.h>
-#include <WebSocketsServer.h>
-#include <Hash.h>
+#include <ArduinoJson.h> // 6.13.0 - Benoit Blanchon
+#include <ESP8266WiFi.h> // 1.0.0 - Ivan Grokhotkov
+#include <WebSocketsServer.h> // 0.4.13 - Gil Maimon
+#include <Hash.h> // 1.0.0 - Markus Sattler
 
 // WIFI-Manager
 #include <FS.h>
-#include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
-#include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
+//Local WebServer used to serve the configuration portal
+//https://github.com/tzapu/WiFiManager WiFi Configuration Magic
+//Local DNS Server used for redirecting all requests to the configuration portal
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix     
+#include <ArduinoOTA.h>
 
 // LED Strips
-#include <Adafruit_NeoPixel.h>
+#include <Adafruit_NeoPixel.h> // 1.3.1 Adafruit
 
 // PIN DEFINITIONS
 #define PIN_RESET 0
@@ -197,6 +202,18 @@ void blink(RGB color, int speed){
     setColor(BLACK);
     delay(speed);
   }
+}
+
+//*************************
+// OTA Updates
+//*************************
+
+void setupOTAUpdates (){
+  ArduinoOTA.onStart([]() {});
+  ArduinoOTA.onEnd([]() {});
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {});
+  ArduinoOTA.onError([](ota_error_t error) {});
+  ArduinoOTA.begin();
 }
 
 //*************************
@@ -459,11 +476,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
       break;
     case WStype_TEXT:{
         String text = String((char *) &payload[0]);
-        if(text.startsWith("J")){
-          // deprecated case
-          // handle it by converting it to the new syntax (removing leading "J")
-          text = (text.substring(text.indexOf("J")+1, text.length()));
-        }
 
         const size_t capacity = JSON_ARRAY_SIZE(10) + JSON_ARRAY_SIZE(10) + JSON_OBJECT_SIZE(2) + 10*JSON_OBJECT_SIZE(3) + 150;
         DynamicJsonDocument tmpStateJson(capacity);
@@ -526,6 +538,8 @@ void setup() {
   setupWifi();
   setColor(BLACK);
 
+  setupOTAUpdates();
+
   currentGradientColors = (RGB *) malloc(sizeof(RGB));
   currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long));
 
@@ -538,6 +552,7 @@ void setup() {
 //*************************
 void loop() {
   webSocket.loop(); // listen for websocket events
+  ArduinoOTA.handle(); // listen for OTA Updates
   if(currentState == STATE_COLOR){
     setColor(currentColor);
     hasNewValue = false;
