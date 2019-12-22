@@ -23,8 +23,8 @@ Date: 22 December 2019
 #include <Adafruit_NeoPixel.h> // 1.3.1 Adafruit
 
 // comment in for serial debugging
-#define DEBUG
-#define DEBUG_SPEED 74880
+// #define DEBUG
+// #define DEBUG_SPEED 74880
 
 // PIN DEFINITIONS
 #define PIN_RESET 0
