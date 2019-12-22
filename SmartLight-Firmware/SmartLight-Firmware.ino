@@ -4,23 +4,27 @@ Version: 0.3.0
 Date: 22 December 2019
 **/
 
-#include <Arduino.h>
 #include <ArduinoJson.h> // 6.13.0 - Benoit Blanchon
 #include <ESP8266WiFi.h> // 1.0.0 - Ivan Grokhotkov
-#include <WebSocketsServer.h> // 0.4.13 - Gil Maimon
+#include <WebSocketsServer.h> // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
 #include <Hash.h> // 1.0.0 - Markus Sattler
 
 // WIFI-Manager
-#include <FS.h>
 //Local WebServer used to serve the configuration portal
 //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 //Local DNS Server used for redirecting all requests to the configuration portal
-#include <DNSServer.h>
+#include <DNSServer.h> // 1.1.0 - Kristijan Novoselic
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix
+#include <WiFiManager.h> // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
+#include <FS.h>
+#include <LittleFS.h>
 
 // LED Strips
 #include <Adafruit_NeoPixel.h> // 1.3.1 Adafruit
+
+// comment in for serial debugging
+// #define DEBUG
+// #define DEBUG_SPEED 74880
 
 // PIN DEFINITIONS
 #define PIN_RESET 0
@@ -108,9 +112,9 @@ To make this transition smooth your gradient should start and end with the same 
 ===============================================================================
 */
 
-
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 
+FS* filesystem = &LittleFS;
 WebSocketsServer webSocket = WebSocketsServer(80);
 
 struct RGB {
@@ -155,12 +159,17 @@ void initStripNeoPixel(){
   pixels.show();
 }
 void initStripAnalog(){
-  pinMode(PIN_RESET, INPUT);
   pinMode(PIN_CH1, OUTPUT);
   pinMode(PIN_CH2, OUTPUT);
   pinMode(PIN_CH3, OUTPUT);
 }
 void initStrip(){
+  #ifdef DEBUG
+    Serial.println("initStrip");
+    Serial.println(String(lamptype));
+    return;
+  #endif
+
   // set new color
   // "NeoPixel", "Analog"
   if(String(lamptype) == String("Analog")){
@@ -186,6 +195,17 @@ void setColorAnalog(RGB color){
   analogWrite(PIN_CH3, map(color.b,0,255,0,1024));
 }
 void setColor(RGB color){
+  #ifdef DEBUG
+    Serial.print("setColor: ");
+    Serial.print(color.r);
+    Serial.print(", ");
+    Serial.print(color.g);
+    Serial.print(", ");
+    Serial.print(color.b);
+    Serial.println("");
+    return;
+  #endif
+
   // set new color
   // "NeoPixel", "Analog"
   if(String(lamptype) == String("Analog")){
@@ -211,16 +231,23 @@ WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>sm
 WiFiManagerParameter setting_lamptype(JSON_LAMP_TYPE, "Type of connected lamp:<br /><span>Options: <code>NeoPixel</code>, <code>Analog</code></span>", lamptype, 32);
 
 void saveConfigCallback () {
+  #ifdef DEBUG
+    Serial.println("save updated config");
+  #endif
   const size_t capacity = JSON_OBJECT_SIZE(2);
   DynamicJsonDocument doc(capacity);
 
   doc[JSON_HOSTNAME] = setting_hostname.getValue();
   doc[JSON_LAMP_TYPE] = setting_lamptype.getValue();
 
-  File configFile = SPIFFS.open(configFilePath, "w");
+  File configFile = filesystem->open(configFilePath, "w");
   serializeJson(doc, configFile);
   configFile.close();
 
+  #ifdef DEBUG
+    Serial.println("config written to filesystem");
+  #endif
+  
   setColor(GREEN);
   delay(1000);
   setColor(BLACK);
@@ -228,70 +255,89 @@ void saveConfigCallback () {
 }
 
 void configModeCallback (WiFiManager *myWiFiManager) {
+  #ifdef DEBUG
+    Serial.println("start config portal");
+  #endif
   setColor(VIOLET);
 }
 
-void setupSpiffs(){
-  // TODO remove color debug statements
+void setupFilesystem(){
+  #ifdef DEBUG
+    Serial.println("setupFilesystem");
+  #endif
+
   // initial values
   ("SmartLight-" + String(ESP.getChipId(), HEX)).toCharArray(hostname, 32);
-  setColor(RED);
-  delay(1000);
-  if (SPIFFS.begin()) {
-    setColor(ORANGE);
-    delay(1000);
-    if (SPIFFS.exists(configFilePath)) {
-      setColor(GREEN);
-      delay(1000);
-      //file exists, reading and loading
-      File configFile = SPIFFS.open(configFilePath, "r");
-      if (configFile) {
-        setColor(BLUE);
-        delay(1000);
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
 
-      setColor(RED);
-      delay(1000);
-        configFile.readBytes(buf.get(), size);
+  #ifdef DEBUG
+    Serial.print("hostname: ");
+    Serial.println(hostname);
+    Serial.print("lamptype: ");
+    Serial.println(lamptype);
+  #endif
 
-      setColor(ORANGE);
-      delay(1000);
-        const size_t capacity = JSON_OBJECT_SIZE(2) + 60;
-        DynamicJsonDocument doc(capacity);
-      setColor(GREEN);
-      delay(1000);
-        auto error = deserializeJson(doc, buf.get());
-        if(error){
-          blink(RED, 500);
-          return;
-        }
-      setColor(BLUE);
-      delay(1000);
-        // copy from config to variable
-        if(doc.containsKey(JSON_HOSTNAME)){
-          setColor(RED);
-          delay(500);
-          strcpy(hostname, doc[JSON_HOSTNAME]);
-          setColor(GREEN);
-          delay(500);
-        }
-        if(doc.containsKey(JSON_LAMP_TYPE)){
-          setColor(RED);
-          delay(500);
-          strcpy(lamptype, doc[JSON_LAMP_TYPE]);
-          setColor(GREEN);
-          delay(500);
-        }
-        blink(BLUE, 500);
-      }
-      blink(ORANGE, 500);
-    }
+  #ifdef DEBUG
+    Serial.println("exec filesystem->begin()");
+  #endif
+  filesystem->begin();
+  #ifdef DEBUG
+    Serial.println("filesystem->begin() executed");
+  #endif
+  
+  if(!filesystem->exists(configFilePath)) {
+    #ifdef DEBUG
+      Serial.println("config file doesn't exist");
+    #endif
+    return; 
+  }
+  #ifdef DEBUG
+    Serial.println("configfile exists");
+  #endif
+
+  //file exists, reading and loading
+  File configFile = filesystem->open(configFilePath, "r");
+  if(!configFile) { return; }
+  #ifdef DEBUG
+    Serial.println("configfile read");
+  #endif
+
+  size_t size = configFile.size();
+  // Allocate a buffer to store contents of the file.
+  std::unique_ptr<char[]> buf(new char[size]);
+  configFile.readBytes(buf.get(), size);
+  const size_t capacity = JSON_OBJECT_SIZE(2) + 60;
+  DynamicJsonDocument doc(capacity);
+  auto error = deserializeJson(doc, buf.get());
+  if(error){ return; }
+  configFile.close();
+
+  #ifdef DEBUG
+    Serial.println("configfile serialized");
+  #endif
+
+  // copy from config to variable
+  if(doc.containsKey(JSON_HOSTNAME)){
+    #ifdef DEBUG
+      Serial.println("JSON_HOSTNAME key read");
+    #endif
+    strcpy(hostname, doc[JSON_HOSTNAME]);
+    #ifdef DEBUG
+      Serial.println("hostname updated");
+    #endif
+  }
+  if(doc.containsKey(JSON_LAMP_TYPE)){
+    #ifdef DEBUG
+      Serial.println("JSON_LAMP_TYPE key read");
+    #endif
+    strcpy(lamptype, doc[JSON_LAMP_TYPE]);
+    #ifdef DEBUG
+      Serial.println("lamptype updated");
+    #endif
   }
 }
 
 bool shouldEnterSetup(){
+  pinMode(PIN_RESET, INPUT);
   byte clickThreshould = 5;
   int timeSlot = 5000;
   byte readingsPerSecond = 10;
@@ -514,12 +560,20 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 //*************************
 
 void setup() {
+  #ifdef DEBUG
+    Serial.begin(DEBUG_SPEED);
+    Serial.print("\n");
+    Serial.setDebugOutput(true);
+    Serial.println("STARTED IN DEBUG MODE");
+  #endif
   
-  initStrip();
+  setupFilesystem();
 
-  // blink(WHITE, 500);
-  // TODO Spiffs before initStrip
-  // setupSpiffs();
+  #ifdef DEBUG
+    Serial.println("setupFilesystem finished");
+  #endif
+
+  initStrip();
 
   setColor(BLUE);
   setupWifi();
