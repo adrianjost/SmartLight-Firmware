@@ -358,6 +358,7 @@ void setupWifi(){
   wm.setClass("invert");
 
   wm.setSaveParamsCallback(saveConfigCallback);
+  wm.setSaveConfigCallback(saveConfigCallback);
   wm.setAPCallback(configModeCallback);
 
   wm.setHostname(hostname);
