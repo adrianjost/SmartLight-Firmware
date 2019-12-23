@@ -117,6 +117,11 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_
 FS* filesystem = &LittleFS;
 WebSocketsServer webSocket = WebSocketsServer(80);
 
+// max 25 gradient steps, 2226 Bytes, each timestamp max 7 digits, each color val max 255
+const size_t maxPayloadSize = 2*JSON_ARRAY_SIZE(25) + 26*JSON_OBJECT_SIZE(3) + 200;
+// 2 keys with each value max 32 chars long, 104 Bytes
+const size_t maxStorageSize = JSON_OBJECT_SIZE(2) + 80;
+
 struct RGB {
   byte r;
   byte g;
@@ -234,8 +239,7 @@ void saveConfigCallback () {
   #ifdef DEBUG
     Serial.println("save updated config");
   #endif
-  const size_t capacity = JSON_OBJECT_SIZE(2);
-  DynamicJsonDocument doc(capacity);
+  DynamicJsonDocument doc(maxStorageSize);
 
   doc[JSON_HOSTNAME] = setting_hostname.getValue();
   doc[JSON_LAMP_TYPE] = setting_lamptype.getValue();
@@ -305,8 +309,7 @@ void setupFilesystem(){
   // Allocate a buffer to store contents of the file.
   std::unique_ptr<char[]> buf(new char[size]);
   configFile.readBytes(buf.get(), size);
-  const size_t capacity = JSON_OBJECT_SIZE(2) + 60;
-  DynamicJsonDocument doc(capacity);
+  DynamicJsonDocument doc(maxStorageSize);
   auto error = deserializeJson(doc, buf.get());
   if(error){ return; }
   configFile.close();
@@ -510,9 +513,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
       break;
     case WStype_TEXT:{
         String text = String((char *) &payload[0]);
-
-        const size_t capacity = JSON_ARRAY_SIZE(10) + JSON_ARRAY_SIZE(10) + JSON_OBJECT_SIZE(2) + 10*JSON_OBJECT_SIZE(3) + 150;
-        DynamicJsonDocument tmpStateJson(capacity);
+        DynamicJsonDocument tmpStateJson(maxPayloadSize);
         auto error = deserializeJson(tmpStateJson, text);
 
         if (error) {
