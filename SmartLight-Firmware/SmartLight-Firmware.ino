@@ -6,7 +6,7 @@ Date: 22 December 2019
 
 #include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
 #include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
-#include <WebSocketsServer.h>   // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
+#include <WebSocketsServer.h>   // 2.1.4 Markus Sattler
 #include <Hash.h>               // 1.0.0 - Markus Sattler
 
 // WIFI-Manager
