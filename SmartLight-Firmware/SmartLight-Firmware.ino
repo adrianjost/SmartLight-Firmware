@@ -232,30 +232,13 @@ void blink(RGB color, int speed){
 // config manager
 //*************************
 
-WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
-WiFiManagerParameter setting_lamptype(JSON_LAMP_TYPE, "Type of connected lamp:<br /><span>Options: <code>NeoPixel</code>, <code>Analog</code></span>", lamptype, 32);
+bool shouldSaveConfig = false;
 
 void saveConfigCallback () {
   #ifdef DEBUG
-    Serial.println("save updated config");
+    Serial.println("shouldSaveConfig");
   #endif
-  DynamicJsonDocument doc(maxStorageSize);
-
-  doc[JSON_HOSTNAME] = setting_hostname.getValue();
-  doc[JSON_LAMP_TYPE] = setting_lamptype.getValue();
-
-  File configFile = filesystem->open(configFilePath, "w");
-  serializeJson(doc, configFile);
-  configFile.close();
-
-  #ifdef DEBUG
-    Serial.println("config written to filesystem");
-  #endif
-
-  setColor(GREEN);
-  delay(1000);
-  setColor(BLACK);
-  ESP.restart();
+  shouldSaveConfig = true;
 }
 
 void configModeCallback (WiFiManager *myWiFiManager) {
@@ -370,6 +353,8 @@ void setupWifi(){
   wm.setAPCallback(configModeCallback);
   wm.setHostname(hostname);
 
+  WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
+  WiFiManagerParameter setting_lamptype(JSON_LAMP_TYPE, "Type of connected lamp:<br /><span>Options: <code>NeoPixel</code>, <code>Analog</code></span>", lamptype, 32);
   wm.addParameter(&setting_hostname);
   wm.addParameter(&setting_lamptype);
 
@@ -387,6 +372,30 @@ void setupWifi(){
     ESP.deepSleep(600000000); // 10 Minutes
     ESP.restart();
   }
+
+  if (shouldSaveConfig) {
+    #ifdef DEBUG
+      Serial.println("write config to filesystem");
+    #endif
+    DynamicJsonDocument doc(maxStorageSize);
+
+    doc[JSON_HOSTNAME] = setting_hostname.getValue();
+    doc[JSON_LAMP_TYPE] = setting_lamptype.getValue();
+
+    File configFile = filesystem->open(configFilePath, "w");
+    serializeJson(doc, configFile);
+    configFile.close();
+
+    #ifdef DEBUG
+      Serial.println("config written to filesystem");
+    #endif
+
+    setColor(GREEN);
+    delay(1000);
+    setColor(BLACK);
+    ESP.restart();
+  }
+
   if(forceSetup){
     ESP.restart();
   }
