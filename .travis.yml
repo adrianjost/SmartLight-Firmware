@@ -40,4 +40,4 @@ install:
   - sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 script:
   # - cat $PWD/SmartLight-Firmware/SmartLight-Firmware.ino
-  - arduino -v --verbose-build --verify "${PWD}/SmartLight-Firmware/SmartLight-Firmware.ino"
+  - arduino --verify "${PWD}/SmartLight-Firmware/SmartLight-Firmware.ino"
