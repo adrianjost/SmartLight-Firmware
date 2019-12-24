@@ -8,7 +8,7 @@ Date: 22 December 2019
 // https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <WiFiManager.h>        // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
 #include <FS.h>
-#include <LittleFS.h>
+#include <LittleFS.h>           // required esp8266-core >2.6.3
 
 // Website Communication
 #include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
@@ -415,9 +415,10 @@ void setupWifi(){
 // gradient stuff
 //*************************
 bool gradientAcitve = false;
+unsigned long stepStartTime;
 unsigned long lastStepTime;
 unsigned long targetTime;
-unsigned long timespan;
+unsigned long currentStepDuration;
 floatRGB currentGradientColor;
 floatRGB dy;
 byte gradientState;
@@ -454,15 +455,14 @@ floatRGB gradientCalculateNewColor(unsigned long dx, floatRGB dy, floatRGB color
 
 //void fade(uint8_t num, unsigned long duration, RGB before, RGB after){
 void gradientInitFade(unsigned long duration, RGB before, RGB after){
-  // TODO [#14]: fix? handle millis overflow
-  lastStepTime = millis();
-  targetTime = lastStepTime + duration;
-  timespan = duration;
+  stepStartTime = millis();
+  currentStepDuration = duration;
+  lastStepTime = stepStartTime;
 
   dy = (floatRGB){
-    (float)((after.r - before.r) / (float)timespan),
-    (float)((after.g - before.g) / (float)timespan),
-    (float)((after.b - before.b) / (float)timespan)
+    (float)((after.r - before.r) / (float)duration),
+    (float)((after.g - before.g) / (float)duration),
+    (float)((after.b - before.b) / (float)duration)
   };
 
   currentGradientColor = RGBtofloatRGB(before);
@@ -472,8 +472,8 @@ void gradientInitFade(unsigned long duration, RGB before, RGB after){
 
 void gradientStep(){
   // breakpoint not reached -> continue fading
-  if (lastStepTime < targetTime){ // TODO: fix? handle millis overflow
-    unsigned long currentTime = millis();
+  unsigned long currentTime = millis();
+  if((unsigned long)(currentTime - stepStartTime) < currentStepDuration) {
     unsigned long dx = currentTime - lastStepTime;
     lastStepTime = currentTime;
     currentGradientColor = gradientCalculateNewColor(dx, dy, currentGradientColor);
@@ -550,7 +550,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           hasNewValue = true;
         }else if(tmpStateJson.containsKey("gradient")){
           gradientState = 0;
-          targetTime = millis();
+          currentStepDuration = 0;
           free(currentGradientColors);
           free(currentGradientTimes);
           numberOfSteps = tmpStateJson["gradient"]["colors"].size();
