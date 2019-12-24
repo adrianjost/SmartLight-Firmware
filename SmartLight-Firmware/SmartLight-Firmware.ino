@@ -4,27 +4,26 @@ Version: 0.3.0
 Date: 22 December 2019
 **/
 
-#include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
-#include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
-#include <WebSocketsServer.h>   // 2.1.4 Markus Sattler
-#include <Hash.h>               // 1.0.0 - Markus Sattler
-
-// WIFI-Manager
-//Local WebServer used to serve the configuration portal
-//https://github.com/tzapu/WiFiManager WiFi Configuration Magic
-//Local DNS Server used for redirecting all requests to the configuration portal
-#include <DNSServer.h>          // 1.1.0 - Kristijan Novoselic
-#include <ESP8266WebServer.h>
+// WiFiManager
+// https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <WiFiManager.h>        // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
 #include <FS.h>
 #include <LittleFS.h>
+
+// Website Communication
+#include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
+#include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
+#include <WebSocketsServer.h>   // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
 
 // LED Strips
 #include <Adafruit_NeoPixel.h>  // 1.3.1 Adafruit
 
 // comment in for serial debugging
 // #define DEBUG
-// #define DEBUG_SPEED 74880
+#ifdef DEBUG
+  #define DEBUG_SPEED 74880
+#endif
+
 
 // PIN DEFINITIONS
 #define PIN_RESET 0
@@ -233,15 +232,18 @@ void blink(RGB color, int speed){
 //*************************
 
 bool shouldSaveConfig = false;
+WiFiManager *globalWiFiManager;
 
 void saveConfigCallback () {
   #ifdef DEBUG
     Serial.println("shouldSaveConfig");
   #endif
   shouldSaveConfig = true;
+  globalWiFiManager->stopConfigPortal();
 }
 
 void configModeCallback (WiFiManager *myWiFiManager) {
+  globalWiFiManager = myWiFiManager;
   #ifdef DEBUG
     Serial.println("start config portal");
   #endif
@@ -335,6 +337,8 @@ bool shouldEnterSetup(){
       click_count++;
       if(click_count >= clickThreshould){
         setColor(VIOLET);
+        pinMode(PIN_RESET, OUTPUT);
+        digitalWrite(PIN_RESET, HIGH);
         return true;
       }
     } else {
@@ -348,9 +352,15 @@ bool shouldEnterSetup(){
 void setupWifi(){
   WiFiManager wm;
   wm.setDebugOutput(false);
+  // close setup after 5min
   wm.setTimeout(300);
+  // set dark theme
+  wm.setClass("invert");
+
+  wm.setSaveParamsCallback(saveConfigCallback);
   wm.setSaveConfigCallback(saveConfigCallback);
   wm.setAPCallback(configModeCallback);
+
   wm.setHostname(hostname);
 
   WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
@@ -361,17 +371,9 @@ void setupWifi(){
   setColor(GREEN);
 
   bool forceSetup = shouldEnterSetup();
-  // TODO [#13]: handle save callback for forced setup with no wifi setting changes.
   bool setup = forceSetup
     ? wm.startConfigPortal("SmartLight Setup", "LightItUp")
     : wm.autoConnect("SmartLight Setup", "LightItUp");
-  if(!setup){
-    setColor(RED);
-    // shut down till the next reboot
-    //ESP.deepSleep(86400000000); // 1 Day
-    ESP.deepSleep(600000000); // 10 Minutes
-    ESP.restart();
-  }
 
   if (shouldSaveConfig) {
     #ifdef DEBUG
@@ -393,6 +395,14 @@ void setupWifi(){
     setColor(GREEN);
     delay(1000);
     setColor(BLACK);
+    ESP.restart();
+  }
+
+  if(!setup){
+    setColor(RED);
+    // shut down till the next reboot
+    // ESP.deepSleep(86400000000); // 1 Day
+    ESP.deepSleep(600000000); // 10 Minutes
     ESP.restart();
   }
 
