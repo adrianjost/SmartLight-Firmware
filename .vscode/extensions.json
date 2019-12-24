@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    // Name: Arduino
+    // Link zum Visual Studio Marketplace: https://marketplace.visualstudio.com/items?itemName=vsciot-vscode.vscode-arduino
+    "vsciot-vscode.vscode-arduino"
+  ]
+}
