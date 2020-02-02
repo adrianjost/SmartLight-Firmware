@@ -1,5 +1,7 @@
 # SmartLight Firmware
 
+[![Build Status](https://travis-ci.com/adrianjost/SmartLight-Firmware.svg?branch=master)](https://travis-ci.com/adrianjost/SmartLight-Firmware)
+
 ## How to use
 
 Please read the full installation guide:
