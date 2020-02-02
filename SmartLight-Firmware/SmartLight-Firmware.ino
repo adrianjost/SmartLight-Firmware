@@ -24,9 +24,8 @@ Date: 22 December 2019
   #define DEBUG_SPEED 74880
 #endif
 
-
 // PIN DEFINITIONS
-#define PIN_RESET 0
+#define PIN_RESET 0 // comment out on boards without reset button
 #define PIN_NEO 2
 #define PIN_CH1 1
 #define PIN_CH2 2
@@ -325,28 +324,33 @@ void setupFilesystem(){
 }
 
 bool shouldEnterSetup(){
-  pinMode(PIN_RESET, INPUT);
-  byte clickThreshould = 5;
-  int timeSlot = 5000;
-  byte readingsPerSecond = 10;
-  byte click_count = 0;
+  #ifndef PIN_RESET
+    return false;
+  #else
+    pinMode(PIN_RESET, INPUT);
+    byte clickThreshould = 5;
+    int timeSlot = 5000;
+    byte readingsPerSecond = 10;
+    byte click_count = 0;
 
-  for(int i=0; i < (timeSlot / readingsPerSecond / 10); i++){
-    byte buttonState = digitalRead(PIN_RESET);
-    if(buttonState == LOW){
-      click_count++;
-      if(click_count >= clickThreshould){
-        setColor(VIOLET);
-        pinMode(PIN_RESET, OUTPUT);
-        digitalWrite(PIN_RESET, HIGH);
-        return true;
+
+    for(int i=0; i < (timeSlot / readingsPerSecond / 10); i++){
+      byte buttonState = digitalRead(PIN_RESET);
+      if(buttonState == LOW){
+        click_count++;
+        if(click_count >= clickThreshould){
+          setColor(VIOLET);
+          pinMode(PIN_RESET, OUTPUT);
+          digitalWrite(PIN_RESET, HIGH);
+          return true;
+        }
+      } else {
+        click_count = 0;
       }
-    } else {
-      click_count = 0;
+      delay(1000 / readingsPerSecond);
     }
-    delay(1000 / readingsPerSecond);
-  }
-  return false;
+    return false;
+  #endif
 }
 
 void setupWifi(){
