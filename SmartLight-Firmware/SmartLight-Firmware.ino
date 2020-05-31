@@ -413,6 +413,8 @@ void setupWifi(){
   if(forceSetup){
     ESP.restart();
   }
+
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 }
 
 //*************************
