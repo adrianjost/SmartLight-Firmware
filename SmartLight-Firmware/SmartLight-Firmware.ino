@@ -406,7 +406,7 @@ void setupWifi(){
     setColor(RED);
     // shut down till the next reboot
     // ESP.deepSleep(86400000000); // 1 Day
-    ESP.deepSleep(600000000); // 10 Minutes
+    ESP.deepSleep(300000000); // 5 Minutes
     ESP.restart();
   }
 
@@ -542,6 +542,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
         if (error) {
           // ERROR parsing State
           currentState = STATE_UNDEFINED;
+          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Failed to parse payload\"}");
           return;
         }
         if(tmpStateJson.containsKey("color")){
@@ -552,6 +553,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           };
           currentState = STATE_COLOR;
           hasNewValue = true;
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
         }else if(tmpStateJson.containsKey("gradient")){
           gradientState = 0;
           currentStepDuration = 0;
@@ -572,8 +574,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           }
           currentState = STATE_GRADIENT;
           hasNewValue = true;
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
         }else{
           currentState = STATE_UNDEFINED;
+          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
         }
       }
       break;
