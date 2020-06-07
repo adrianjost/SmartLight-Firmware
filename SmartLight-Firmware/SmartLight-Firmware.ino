@@ -1,7 +1,7 @@
 /**
 Author: Adrian Jost
-Version: 0.3.0
-Date: 22 December 2019
+Version: 3.1.0
+Date: 7 June 2020
 **/
 
 // WiFiManager
@@ -14,6 +14,9 @@ Date: 22 December 2019
 #include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
 #include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
 #include <WebSocketsServer.h>   // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
+
+// OTA Updates
+#include <ArduinoOTA.h>
 
 // LED Strips
 #include <Adafruit_NeoPixel.h>  // 1.3.1 Adafruit
@@ -39,7 +42,6 @@ Date: 22 December 2019
 #define configFilePath "/config.json"
 #define JSON_HOSTNAME "hn"
 #define JSON_LAMP_TYPE "lt"
-
 
 // current state
 #define STATE_UNDEFINED 0
@@ -110,6 +112,8 @@ To make this transition smooth your gradient should start and end with the same 
 ===============================================================================
 */
 
+WiFiManager wm;
+
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 
 FS* filesystem = &LittleFS;
@@ -139,6 +143,8 @@ struct floatRGB {
 
 char lamptype[32] = "Analog"; // "NeoPixel", "Analog"
 char hostname[32] = "A CHIP";
+char wifiPassword[32] = "";
+
 
 byte currentState = STATE_UNDEFINED;
 bool hasNewValue = false;
@@ -354,7 +360,6 @@ bool shouldEnterSetup(){
 }
 
 void setupWifi(){
-  WiFiManager wm;
   wm.setDebugOutput(false);
   // close setup after 5min
   wm.setTimeout(300);
@@ -416,6 +421,37 @@ void setupWifi(){
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 }
+
+void setupOTAUpdate(){
+  wm.getWiFiPass().toCharArray(wifiPassword, 32);
+  ArduinoOTA.setHostname(hostname);
+  ArduinoOTA.setPassword(wifiPassword);
+
+  #ifdef DEBUG
+    ArduinoOTA.onStart([]() {
+      Serial.println("Start");
+    });
+    ArduinoOTA.onEnd([]() {
+      Serial.println("\nEnd");
+    });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+  #endif
+  ArduinoOTA.begin();
+  #ifdef DEBUG
+    Serial.println("OTA ready");
+  #endif
+}
+
 
 //*************************
 // gradient stuff
@@ -608,6 +644,7 @@ void setup() {
 
   setColor(BLUE);
   setupWifi();
+  setupOTAUpdate();
   setColor(BLACK);
 
   currentGradientColors = (RGB *) malloc(sizeof(RGB));
@@ -621,6 +658,7 @@ void setup() {
 // LOOP
 //*************************
 void loop() {
+  ArduinoOTA.handle(); // listen for OTA Updates
   webSocket.loop(); // listen for websocket events
   if(currentState == STATE_COLOR){
     setColor(currentColor);
