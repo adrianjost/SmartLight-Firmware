@@ -24,14 +24,16 @@ Date: 7 June 2020
 // comment in for serial debugging
 // #define DEBUG
 #ifdef DEBUG
-  #define DEBUG_SPEED 74880
+  #define DEBUG_SPEED 115200
 #endif
 
 // PIN DEFINITIONS
-#define PIN_RESET 0 // comment out on boards without reset button
-#define PIN_NEO 2
+#define PIN_RESET 0 // comment out on boards without FLASH-button
+#define PIN_INPUT 2
+// TODO: remove all NEO-Pixel code if not defined
+// #define PIN_NEO 1
 #define PIN_CH1 1
-#define PIN_CH2 2
+// #define PIN_CH2 3
 #define PIN_CH3 3
 
 // NeoPixel settings
@@ -56,6 +58,18 @@ Date: 7 June 2020
 #define BLUE RGB{0,0,55}
 #define ORANGE RGB{55,55,0}
 #define VIOLET RGB{55,0,55}
+
+// button control
+#define TIMEOUT 500
+#define TIMEOUT_INFINITY 60000 // 1min
+#define BRIGHTNESS_MIN 0
+#define BRIGHTNESS_MAX 255
+#define BRIGHNESS_STEP 1
+#define BRIGHNESS_STEP_DURATION 15
+#define HUE_MIN 0
+#define HUE_MAX 1
+#define HUE_STEP 0.01
+#define HUE_STEP_DURATION 50
 
 /*
 API
@@ -114,7 +128,9 @@ To make this transition smooth your gradient should start and end with the same 
 
 WiFiManager wm;
 
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
+#ifdef PIN_NEO
+Adafruit_NeoPixel    = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
+#endif
 
 FS* filesystem = &LittleFS;
 WebSocketsServer webSocket = WebSocketsServer(80);
@@ -163,14 +179,22 @@ bool currentGradientLoop;
 **********************************/
 
 void initStripNeoPixel(){
-  pixels.begin(); // This initializes the NeoPixel library.
-  pixels.setBrightness(NEO_BRIGHTNESS);
-  pixels.show();
+  #ifdef PIN_NEO
+    pixels.begin(); // This initializes the NeoPixel library.
+    pixels.setBrightness(NEO_BRIGHTNESS);
+    pixels.show();
+  #endif
 }
 void initStripAnalog(){
-  pinMode(PIN_CH1, OUTPUT);
-  pinMode(PIN_CH2, OUTPUT);
-  pinMode(PIN_CH3, OUTPUT);
+  #ifdef PIN_CH1
+    pinMode(PIN_CH1, OUTPUT);
+  #endif
+  #ifdef PIN_CH2
+    pinMode(PIN_CH2, OUTPUT);
+  #endif
+  #ifdef PIN_CH3
+    pinMode(PIN_CH3, OUTPUT);
+  #endif
 }
 void initStrip(){
   #ifdef DEBUG
@@ -193,15 +217,23 @@ void initStrip(){
 **********************************/
 
 void setColorNeoPixel(RGB color){
-  for (int i = 0; i < pixels.numPixels(); i++) {
-    pixels.setPixelColor(i, pixels.Color(color.r, color.g, color.b));
-  }
-  pixels.show();
+  #ifdef PIN_NEO
+    for (int i = 0; i < pixels.numPixels(); i++) {
+      pixels.setPixelColor(i, pixels.Color(color.r, color.g, color.b));
+    }
+    pixels.show();
+  #endif
 }
 void setColorAnalog(RGB color){
-  analogWrite(PIN_CH1, map(color.r,0,255,0,1024));
-  analogWrite(PIN_CH2, map(color.g,0,255,0,1024));
-  analogWrite(PIN_CH3, map(color.b,0,255,0,1024));
+  #ifdef PIN_CH1
+    analogWrite(PIN_CH1, map(color.r,0,255,0,1024));
+  #endif
+  #ifdef PIN_CH2
+    analogWrite(PIN_CH2, map(color.g,0,255,0,1024));
+  #endif
+  #ifdef PIN_CH3
+    analogWrite(PIN_CH3, map(color.b,0,255,0,1024));
+  #endif
 }
 void setColor(RGB color){
   #ifdef DEBUG
@@ -623,6 +655,132 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 }
 
 //*************************
+// button control
+//*************************
+byte brightness = 0;
+float hue = 0.5;
+
+void setLED(byte ww, byte cw) {
+  currentColor = floatRGBtoRGB({
+    constrain(ww, BRIGHTNESS_MIN, BRIGHTNESS_MAX),
+    0,
+    constrain(cw, BRIGHTNESS_MIN, BRIGHTNESS_MAX)
+  });
+  setColor(currentColor);
+}
+
+void updateLED() {
+  float ww = hue < 0.5 ? 1 : (2 - (2 * hue));
+  float cw = hue < 0.5 ? (hue * 2) : 1;
+  setLED(brightness * ww, brightness * cw);
+}
+
+bool isBtn(bool state = true, unsigned long debounceDuration = 50) {
+  // debounce
+  unsigned long touchStart = millis();
+  unsigned long match = 0;
+  unsigned long noMatch = 0;
+  do {
+    if (digitalRead(PIN_INPUT) != state) {
+      match += 1;
+    }else{
+      noMatch += 1;
+    }
+    // TODO: use min method instead of ternariy operator
+    delay(debounceDuration < 5 ? debounceDuration : 5);
+  } while(millis() - touchStart < debounceDuration);
+  return (match >= noMatch);
+}
+
+bool waitForBtn(int ms, bool state = true) {
+  if(ms == 0){
+    return isBtn(state, 0);
+  }
+  unsigned long start = millis();
+  do {
+    if (isBtn(state)) {
+      return true;
+    }
+  } while (millis() - start < ms);
+  return false;
+}
+
+float getHue(RGB color) {
+  byte warm = color.r;
+  byte cold = color.b;
+  if(warm == cold){
+    return 0.5;
+  }
+  if(warm == 0){
+    return 1;
+  }
+  if(cold == 0){
+    return 0;
+  }
+  if(warm >= cold){
+    return (cold / (2 * warm));
+  }else {
+    return 1 - (warm / (2 * cold));
+  }
+}
+
+float getBrightness(RGB color) {
+  return max(color.r, color.b);
+}
+
+void handleButton(){
+  if (waitForBtn(0, true)) {
+    if (waitForBtn(TIMEOUT, false)) {
+      if (waitForBtn(TIMEOUT, true)) {
+        if (waitForBtn(TIMEOUT, false)) {
+          if (waitForBtn(TIMEOUT, true)) {
+            if (waitForBtn(TIMEOUT, false)) {
+              if (waitForBtn(TIMEOUT, true) && !waitForBtn(TIMEOUT, false)) {
+                // tap tap tap hold
+                // cycle hue +
+                while (hue + HUE_STEP <= HUE_MAX && isBtn(true, HUE_STEP_DURATION)) {
+                  hue += HUE_STEP;
+                  updateLED();
+                }
+              }
+            } else {
+              // tap tap hold
+              // cycle hue -
+                while (hue - HUE_STEP >= HUE_MIN && isBtn(true, HUE_STEP_DURATION)) {
+                  hue -= HUE_STEP;
+                  updateLED();
+                }
+            }
+          } else {
+            // tap tap
+          }
+        } else {
+          // tap, hold
+          // increase brightness
+          while (brightness + BRIGHNESS_STEP <= BRIGHTNESS_MAX && isBtn(true, BRIGHNESS_STEP_DURATION)) {
+            brightness += BRIGHNESS_STEP;
+            updateLED();
+          }
+        }
+      } else {
+        // tap
+        // toggle power
+        brightness = (brightness == 0) ? BRIGHTNESS_MAX : BRIGHTNESS_MIN;
+        updateLED();
+      }
+    } else {
+      // hold
+      // reduce brightness
+      while (brightness - BRIGHNESS_STEP >= BRIGHTNESS_MIN && isBtn(true, BRIGHNESS_STEP_DURATION)) {
+        brightness -= BRIGHNESS_STEP;
+        updateLED();
+      }
+    }
+    waitForBtn(TIMEOUT_INFINITY, false);
+  }
+}
+
+//*************************
 // SETUP
 //*************************
 
@@ -632,6 +790,10 @@ void setup() {
     Serial.print("\n");
     Serial.setDebugOutput(true);
     Serial.println("STARTED IN DEBUG MODE");
+  #endif
+
+  #ifdef PIN_INPUT
+    pinMode(PIN_INPUT, INPUT);
   #endif
 
   setupFilesystem();
@@ -644,6 +806,7 @@ void setup() {
 
   setColor(BLUE);
   setupWifi();
+  setColor(GREEN);
   setupOTAUpdate();
   setColor(BLACK);
 
@@ -660,10 +823,15 @@ void setup() {
 void loop() {
   ArduinoOTA.handle(); // listen for OTA Updates
   webSocket.loop(); // listen for websocket events
+  #ifdef PIN_INPUT
+    handleButton(); // listen for hardware inputs
+  #endif
   if(currentState == STATE_COLOR){
     setColor(currentColor);
     hasNewValue = false;
     currentState = STATE_UNDEFINED;
+    brightness = getBrightness(currentColor);
+    hue = getHue(currentColor);
   } else if(currentState == STATE_GRADIENT){
     if(!gradientLoop(hasNewValue)){
       currentState = STATE_UNDEFINED;
