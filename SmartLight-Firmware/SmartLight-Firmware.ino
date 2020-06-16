@@ -667,6 +667,7 @@ void setLED(byte ww, byte cw) {
     constrain(cw, BRIGHTNESS_MIN, BRIGHTNESS_MAX)
   });
   setColor(currentColor);
+  webSocket.broadcastTXT("{\"color\":{\"1\":\"" + String(currentColor.r) + "\",\"2\":\"0\",\"3\":\"" + String(currentColor.b) + "\"}}");
 }
 
 void updateLED() {
