@@ -21,6 +21,10 @@ Date: 7 June 2020
 // LED Strips
 #include <Adafruit_NeoPixel.h>  // 1.3.1 Adafruit
 
+// Time Keeping
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
 // comment in for serial debugging
 // #define DEBUG
 #ifdef DEBUG
@@ -134,6 +138,10 @@ Adafruit_NeoPixel    = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ8
 
 FS* filesystem = &LittleFS;
 WebSocketsServer webSocket = WebSocketsServer(80);
+
+// Define NTP Client to get time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
 // max 25 gradient steps, 2226 Bytes, each timestamp max 7 digits, each color val max 255
 const size_t maxPayloadSize = 2*JSON_ARRAY_SIZE(25) + 26*JSON_OBJECT_SIZE(3) + 200;
@@ -668,6 +676,10 @@ void setLED(byte ww, byte cw) {
   });
   setColor(currentColor);
   webSocket.broadcastTXT("{\"color\":{\"1\":\"" + String(currentColor.r) + "\",\"2\":\"0\",\"3\":\"" + String(currentColor.b) + "\"}}");
+
+  // TODO: remove test
+  timeClient.update(); // update current time
+  webSocket.broadcastTXT(String(timeClient.getHours()) + ":" + String(timeClient.getMinutes()) + ":" + String(timeClient.getSeconds()));
 }
 
 void updateLED() {
@@ -816,6 +828,9 @@ void setup() {
 
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
+
+  timeClient.begin();
+
 }
 
 //*************************
