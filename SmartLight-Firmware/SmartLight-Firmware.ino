@@ -15,6 +15,8 @@ Date: 7 June 2020
 #include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
 #include <WebSocketsServer.h>   // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
 
+#include <ESP8266WebServer.h>   //
+
 // OTA Updates
 #include <ArduinoOTA.h>
 
@@ -50,9 +52,11 @@ Date: 7 June 2020
 #define JSON_LAMP_TYPE "lt"
 
 // current state
-#define STATE_UNDEFINED 0
-#define STATE_COLOR 1
-#define STATE_GRADIENT 2
+#define STATE_OFF 0
+#define STATE_UNDEFINED 1
+#define STATE_COLOR 2
+#define STATE_GRADIENT 3
+#define STATE_TIME 4
 
 // Debug colors
 #define BLACK RGB{0,0,0}
@@ -75,6 +79,8 @@ Date: 7 June 2020
 #define HUE_STEP 0.01
 #define HUE_STEP_DURATION 50
 
+// Durations in ms
+#define DURATION_MINUTE 60000
 /*
 API
 ===============================================================================
@@ -133,10 +139,11 @@ To make this transition smooth your gradient should start and end with the same 
 WiFiManager wm;
 
 #ifdef PIN_NEO
-Adafruit_NeoPixel    = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
+  Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 #endif
 
 FS* filesystem = &LittleFS;
+ESP8266WebServer server(81);
 WebSocketsServer webSocket = WebSocketsServer(80);
 
 // Define NTP Client to get time
@@ -170,7 +177,7 @@ char hostname[32] = "A CHIP";
 char wifiPassword[32] = "";
 
 
-byte currentState = STATE_UNDEFINED;
+byte currentState = STATE_OFF;
 bool hasNewValue = false;
 
 // currentState == STATE_COLOR
@@ -492,11 +499,10 @@ void setupOTAUpdate(){
   #endif
 }
 
-
 //*************************
 // gradient stuff
 //*************************
-bool gradientAcitve = false;
+bool gradientActive = false;
 unsigned long stepStartTime;
 unsigned long lastStepTime;
 unsigned long targetTime;
@@ -531,7 +537,8 @@ floatRGB gradientCalculateNewColor(unsigned long dx, floatRGB dy, floatRGB color
     gradientCalculateNewColorChannelValue(dx, dy.g, color.g),
     gradientCalculateNewColorChannelValue(dx, dy.b, color.b),
   };
-  setColor(floatRGBtoRGB(color));
+  currentColor = floatRGBtoRGB(color);
+  setColor(currentColor);
   return color;
 }
 
@@ -549,7 +556,7 @@ void gradientInitFade(unsigned long duration, RGB before, RGB after){
 
   currentGradientColor = RGBtofloatRGB(before);
 
-  gradientAcitve = true;
+  gradientActive = true;
 }
 
 void gradientStep(){
@@ -580,15 +587,15 @@ void gradientStep(){
     return;
   }
   // stop gradient
-  gradientAcitve = false;
+  gradientActive = false;
 }
 
 bool gradientLoop(bool restart){
   if(restart){
     gradientState = 0;
-    gradientAcitve = true;
+    gradientActive = true;
   }
-  if(gradientAcitve){
+  if(gradientActive){
     gradientStep();
     return true;
   }else{
@@ -597,8 +604,38 @@ bool gradientLoop(bool restart){
 }
 
 //*************************
+// webserver communication
+//*************************
+
+void handleRoot() {
+  server.send(200, "text/plain", "Available routes:\nGET /color");   // Send HTTP status 200 (Ok) and send some text to the browser/client
+}
+
+void handleNotFound(){
+  server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
+}
+
+void handleColor(){
+    server.send(200, "text/json", "{\"color\":{\"1\":\"" + String(currentColor.r) + "\",\"2\":\"" + String(currentColor.g) + "\",\"3\":\"" + String(currentColor.b) + "\"}}");
+}
+
+void setupServer(){
+  server.on("/", handleRoot);
+  server.on("/color", handleColor);
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+}
+
+
+//*************************
 // websocket communication
 //*************************
+
+
+void broadcastCurrentColor() {
+  webSocket.broadcastTXT("{\"color\":{\"1\":\"" + String(currentColor.r) + "\",\"2\":\"" + String(currentColor.g) + "\",\"3\":\"" + String(currentColor.b) + "\"}}");
+}
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
   switch(type) {
@@ -607,9 +644,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
       }
       break;
     case WStype_CONNECTED:{
-      // CONNECTED
-      // webSocket.sendTXT(num,"{\"hostname\":\""+host+"\"}");
-        webSocket.sendTXT(num, "CONNECTED");
+        // CONNECTED
+        broadcastCurrentColor();
       }
       break;
     case WStype_TEXT:{
@@ -662,30 +698,26 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
   }
 }
 
+void setupWebsocket(){
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
+}
+
 //*************************
 // button control
 //*************************
 byte brightness = 0;
 float hue = 0.5;
 
-void setLED(byte ww, byte cw) {
-  currentColor = floatRGBtoRGB({
-    constrain(ww, BRIGHTNESS_MIN, BRIGHTNESS_MAX),
-    0,
-    constrain(cw, BRIGHTNESS_MIN, BRIGHTNESS_MAX)
-  });
-  setColor(currentColor);
-  webSocket.broadcastTXT("{\"color\":{\"1\":\"" + String(currentColor.r) + "\",\"2\":\"0\",\"3\":\"" + String(currentColor.b) + "\"}}");
-
-  // TODO: remove test
-  timeClient.update(); // update current time
-  webSocket.broadcastTXT(String(timeClient.getHours()) + ":" + String(timeClient.getMinutes()) + ":" + String(timeClient.getSeconds()));
-}
-
 void updateLED() {
   float ww = hue < 0.5 ? 1 : (2 - (2 * hue));
   float cw = hue < 0.5 ? (hue * 2) : 1;
-  setLED(brightness * ww, brightness * cw);
+  currentColor = floatRGBtoRGB({
+    constrain(brightness * ww, BRIGHTNESS_MIN, BRIGHTNESS_MAX),
+    0,
+    constrain(brightness * cw, BRIGHTNESS_MIN, BRIGHTNESS_MAX)
+  });
+  setColor(currentColor);
 }
 
 bool isBtn(bool state = true, unsigned long debounceDuration = 50) {
@@ -719,8 +751,9 @@ bool waitForBtn(int ms, bool state = true) {
 }
 
 float getHue(RGB color) {
-  byte warm = color.r;
-  byte cold = color.b;
+  floatRGB c = RGBtofloatRGB(color);
+  float warm = c.r;
+  float cold = c.b;
   if(warm == cold){
     return 0.5;
   }
@@ -750,6 +783,7 @@ void handleButton(){
             if (waitForBtn(TIMEOUT, false)) {
               if (waitForBtn(TIMEOUT, true) && !waitForBtn(TIMEOUT, false)) {
                 // tap tap tap hold
+                currentState = STATE_UNDEFINED;
                 // cycle hue +
                 while (hue + HUE_STEP <= HUE_MAX && isBtn(true, HUE_STEP_DURATION)) {
                   hue += HUE_STEP;
@@ -758,17 +792,19 @@ void handleButton(){
               }
             } else {
               // tap tap hold
+              currentState = STATE_UNDEFINED;
               // cycle hue -
-                while (hue - HUE_STEP >= HUE_MIN && isBtn(true, HUE_STEP_DURATION)) {
-                  hue -= HUE_STEP;
-                  updateLED();
-                }
+              while (hue - HUE_STEP >= HUE_MIN && isBtn(true, HUE_STEP_DURATION)) {
+                hue -= HUE_STEP;
+                updateLED();
+              }
             }
           } else {
             // tap tap
           }
         } else {
           // tap, hold
+          currentState = STATE_UNDEFINED;
           // increase brightness
           while (brightness + BRIGHNESS_STEP <= BRIGHTNESS_MAX && isBtn(true, BRIGHNESS_STEP_DURATION)) {
             brightness += BRIGHNESS_STEP;
@@ -777,12 +813,19 @@ void handleButton(){
         }
       } else {
         // tap
-        // toggle power
-        brightness = (brightness == 0) ? BRIGHTNESS_MAX : BRIGHTNESS_MIN;
-        updateLED();
+        if(currentState == STATE_OFF){
+          // on
+          currentState = STATE_TIME;
+        }else{
+          // off
+          brightness = BRIGHTNESS_MIN;
+          updateLED();
+          currentState = STATE_OFF;
+        }
       }
     } else {
       // hold
+      currentState = STATE_UNDEFINED;
       // reduce brightness
       while (brightness - BRIGHNESS_STEP >= BRIGHTNESS_MIN && isBtn(true, BRIGHNESS_STEP_DURATION)) {
         brightness -= BRIGHNESS_STEP;
@@ -826,19 +869,23 @@ void setup() {
   currentGradientColors = (RGB *) malloc(sizeof(RGB));
   currentGradientTimes = (unsigned long *) malloc(sizeof(unsigned long));
 
-  webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
+  setupServer();
+  setupWebsocket();
 
   timeClient.begin();
-
+  timeClient.update();
 }
 
 //*************************
 // LOOP
 //*************************
+unsigned long lastTimeUpdate = 0;
+unsigned long lastTimeSend = 0;
+
 void loop() {
   ArduinoOTA.handle(); // listen for OTA Updates
   webSocket.loop(); // listen for websocket events
+  server.handleClient(); // listen for HTTP Requests
   #ifdef PIN_INPUT
     handleButton(); // listen for hardware inputs
   #endif
@@ -852,7 +899,26 @@ void loop() {
     if(!gradientLoop(hasNewValue)){
       currentState = STATE_UNDEFINED;
     }else{
-        hasNewValue = false;
+      hasNewValue = false;
     }
+    brightness = getBrightness(currentColor);
+    hue = getHue(currentColor);
+  }
+  if(currentState == STATE_TIME){
+    // TODO read current color from time-color-map
+    if(millis() - lastTimeUpdate > DURATION_MINUTE * 5){
+      timeClient.update();
+      lastTimeUpdate = millis();
+    }
+    if(millis() - lastTimeSend > 1000){
+      webSocket.broadcastTXT(String(timeClient.getHours()) + ":" + String(timeClient.getMinutes()) + ":" + String(timeClient.getSeconds()));
+      lastTimeSend = millis();
+    }
+    brightness = map(timeClient.getSeconds(), 0, 60, 0, 255);
+    updateLED();
+  }
+
+  if(currentState == STATE_UNDEFINED && currentColor.r == 0 && currentColor.g == 0&& currentColor.b == 0){
+    currentState = STATE_OFF;
   }
 }
