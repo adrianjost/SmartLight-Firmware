@@ -189,6 +189,10 @@ unsigned long *currentGradientTimes; // create pointer where informations can be
 byte numberOfSteps;
 bool currentGradientLoop;
 
+// currentState == STATE_UNDEFINED || currentState == STATE_TIME
+byte brightness = 0;
+float hue = 0.5;
+
 /**********************************
  INIT
 **********************************/
@@ -706,9 +710,6 @@ void setupWebsocket(){
 //*************************
 // button control
 //*************************
-byte brightness = 0;
-float hue = 0.5;
-
 void updateLED() {
   float ww = hue < 0.5 ? 1 : (2 - (2 * hue));
   float cw = hue < 0.5 ? (hue * 2) : 1;
@@ -837,6 +838,39 @@ void handleButton(){
 }
 
 //*************************
+// time control
+//*************************
+// 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
+byte time_brightness[24] = {55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55,55};
+float time_hue[24] = {0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0};
+
+#define STEP_PRECISION 10000.0
+
+unsigned long lastTimeUpdate = 0;
+unsigned long lastTimeSend = 0;
+void setByTime() {
+  if(millis() - lastTimeUpdate > DURATION_MINUTE * 5){
+    timeClient.update();
+    lastTimeUpdate = millis();
+  }
+  byte minutes = timeClient.getSeconds(); // timeClient.getMinutes() % 60; // ((timeClient.getMinutes() * 60) + timeClient.getSeconds());
+  byte hour = timeClient.getMinutes() % 24; // timeClient.getHours() % 24;
+  brightness = map(minutes, 0, 60, time_brightness[hour], time_brightness[(hour + 1) % 24]);
+  hue = map(
+      minutes, 0, 60, 
+      (unsigned int)(time_hue[hour] * STEP_PRECISION),
+      (unsigned int)(time_hue[(hour + 1) % 24] * STEP_PRECISION)
+    ) / STEP_PRECISION;
+  if(millis() - lastTimeSend > 1000){
+    webSocket.broadcastTXT("MINUTES: " + String(minutes) + " HOUR: " + String(hour));
+    webSocket.broadcastTXT("BRIGHTNESS: " + String(brightness) + " HUE: " + String(hue));
+    broadcastCurrentColor();
+    lastTimeSend = millis();
+  }
+  updateLED();
+}
+
+//*************************
 // SETUP
 //*************************
 
@@ -879,8 +913,6 @@ void setup() {
 //*************************
 // LOOP
 //*************************
-unsigned long lastTimeUpdate = 0;
-unsigned long lastTimeSend = 0;
 
 void loop() {
   ArduinoOTA.handle(); // listen for OTA Updates
@@ -889,36 +921,34 @@ void loop() {
   #ifdef PIN_INPUT
     handleButton(); // listen for hardware inputs
   #endif
-  if(currentState == STATE_COLOR){
-    setColor(currentColor);
-    hasNewValue = false;
-    currentState = STATE_UNDEFINED;
-    brightness = getBrightness(currentColor);
-    hue = getHue(currentColor);
-  } else if(currentState == STATE_GRADIENT){
-    if(!gradientLoop(hasNewValue)){
-      currentState = STATE_UNDEFINED;
-    }else{
-      hasNewValue = false;
-    }
-    brightness = getBrightness(currentColor);
-    hue = getHue(currentColor);
-  }
-  if(currentState == STATE_TIME){
-    // TODO read current color from time-color-map
-    if(millis() - lastTimeUpdate > DURATION_MINUTE * 5){
-      timeClient.update();
-      lastTimeUpdate = millis();
-    }
-    if(millis() - lastTimeSend > 1000){
-      webSocket.broadcastTXT(String(timeClient.getHours()) + ":" + String(timeClient.getMinutes()) + ":" + String(timeClient.getSeconds()));
-      lastTimeSend = millis();
-    }
-    brightness = map(timeClient.getSeconds(), 0, 60, 0, 255);
-    updateLED();
-  }
-
-  if(currentState == STATE_UNDEFINED && currentColor.r == 0 && currentColor.g == 0&& currentColor.b == 0){
-    currentState = STATE_OFF;
+  switch (currentState) {
+    case STATE_COLOR: {
+        setColor(currentColor);
+        hasNewValue = false;
+        currentState = STATE_UNDEFINED;
+        brightness = getBrightness(currentColor);
+        hue = getHue(currentColor);
+      }
+      break;
+    case STATE_GRADIENT: {
+        if(!gradientLoop(hasNewValue)){
+          currentState = STATE_UNDEFINED;
+        }else{
+          hasNewValue = false;
+        }
+        brightness = getBrightness(currentColor);
+        hue = getHue(currentColor);
+      }
+      break;
+    case STATE_TIME: {
+        setByTime();
+      }
+      break;
+    case STATE_UNDEFINED: {
+        if(currentColor.r == 0 && currentColor.g == 0&& currentColor.b == 0){
+          currentState = STATE_OFF;
+        }
+      }
+      break;
   }
 }
