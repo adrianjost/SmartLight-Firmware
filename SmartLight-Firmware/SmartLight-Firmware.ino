@@ -60,12 +60,12 @@ Date: 7 June 2020
 
 // Debug colors
 #define BLACK RGB{0,0,0}
-#define WHITE RGB{255,255,255}
-#define RED RGB{55,0,0}
-#define GREEN RGB{0,55,0}
-#define BLUE RGB{0,0,55}
-#define ORANGE RGB{55,55,0}
-#define VIOLET RGB{55,0,55}
+#define WHITE RGB{20,20,20}
+#define RED RGB{20,0,0}
+#define GREEN RGB{0,20,0}
+#define BLUE RGB{0,0,20}
+#define ORANGE RGB{20,20,0}
+#define VIOLET RGB{20,0,20}
 
 // button control
 #define TIMEOUT 500
@@ -73,7 +73,7 @@ Date: 7 June 2020
 #define BRIGHTNESS_MIN 0
 #define BRIGHTNESS_MAX 255
 #define BRIGHNESS_STEP 1
-#define BRIGHNESS_STEP_DURATION 15
+#define BRIGHNESS_STEP_DURATION 40
 #define HUE_MIN 0
 #define HUE_MAX 1
 #define HUE_STEP 0.01
@@ -636,9 +636,8 @@ void setupServer(){
 // websocket communication
 //*************************
 
-
 void broadcastCurrentColor() {
-  webSocket.broadcastTXT("{\"color\":{\"1\":\"" + String(currentColor.r) + "\",\"2\":\"" + String(currentColor.g) + "\",\"3\":\"" + String(currentColor.b) + "\"}}");
+  webSocket.broadcastTXT("{\"color\":{\"1\":" + String(currentColor.r) + ",\"2\":" + String(currentColor.g) + ",\"3\":" + String(currentColor.b) + "}}");
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
@@ -671,7 +670,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           };
           currentState = STATE_COLOR;
           hasNewValue = true;
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          broadcastCurrentColor();
         }else if(tmpStateJson.containsKey("gradient")){
           gradientState = 0;
           currentStepDuration = 0;
@@ -710,6 +709,7 @@ void setupWebsocket(){
 //*************************
 // button control
 //*************************
+
 void updateLED() {
   float ww = hue < 0.5 ? 1 : (2 - (2 * hue));
   float cw = hue < 0.5 ? (hue * 2) : 1;
