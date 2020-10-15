@@ -4,35 +4,6 @@ Version: 3.1.0
 Date: 7 June 2020
 **/
 
-// WiFiManager
-// https://github.com/tzapu/WiFiManager WiFi Configuration Magic
-#include <WiFiManager.h>        // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
-#include <FS.h>
-#include <LittleFS.h>           // required esp8266-core >2.6.3
-
-// Website Communication
-#include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
-#include <ArduinoJson.h>        // 6.13.0 - Benoit Blanchon
-#include <WebSocketsServer.h>   // 0.4.13 - Gil Maimon or 2.1.4 Markus Sattler (I am not sure which lib gets used)
-
-#include <ESP8266WebServer.h>   //
-
-// OTA Updates
-#include <ArduinoOTA.h>
-
-// LED Strips
-#include <Adafruit_NeoPixel.h>  // 1.3.1 Adafruit
-
-// Time Keeping
-#include <NTPClient.h>
-#include <WiFiUdp.h>
-
-// comment in for serial debugging
-// #define DEBUG
-#ifdef DEBUG
-  #define DEBUG_SPEED 115200
-#endif
-
 // PIN DEFINITIONS
 #define PIN_RESET 0 // comment out on boards without FLASH-button
 #define PIN_INPUT 2
@@ -81,6 +52,38 @@ Date: 7 June 2020
 
 // Durations in ms
 #define DURATION_MINUTE 60000
+
+// WiFiManager
+// https://github.com/tzapu/WiFiManager WiFi Configuration Magic
+#include <WiFiManager.h>        // 1.0.0 - tzapu,tablatronix (GitHub Develop Branch c9665ad)
+#include <FS.h>
+#include <LittleFS.h>           // requires esp8266-core >2.6.3
+
+// Website Communication
+#include <ESP8266WiFi.h>        // 1.0.0 - Ivan Grokhotkov
+#include <ArduinoJson.h>        // 6.16.1 - Benoit Blanchon
+#include <WebSocketsServer.h>   // 2.1.4 Markus Sattler
+
+#include <ESP8266WebServer.h>   //
+
+// OTA Updates
+#include <ArduinoOTA.h>
+
+// LED Strips
+#ifdef PIN_NEO
+#include <Adafruit_NeoPixel.h>  // 1.3.1 Adafruit
+#endif
+
+// Time Keeping
+#include <NTPClient.h> // 3.2.0 Fabrice Weinberg
+#include <WiFiUdp.h>
+
+// comment in for serial debugging
+// #define DEBUG
+#ifdef DEBUG
+  #define DEBUG_SPEED 115200
+#endif
+
 /*
 API
 ===============================================================================
@@ -840,9 +843,10 @@ void handleButton(){
 //*************************
 // time control
 //*************************
+#define TIMEZONE_OFFSET 2 // TODO: values should always be saved in UTC
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
-byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 204, 128, 45, 10, 1};
-float time_hue[24] = {0.01, 0.01, 0.01, 0.02, 0.05, 0.2, 0.5, 0.8, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 0.5, 0.2, 0.05, 0.01};
+byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 130, 40, 20, 5, 1};
+float time_hue[24] = {0.01, 0.01, 0.01, 0.02, 0.05, 0.2, 0.5, 0.8, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 0.5, 0.3, 0.1, 0.05, 0.01};
 
 #define STEP_PRECISION 10000.0
 
@@ -853,13 +857,13 @@ void setByTime() {
     timeClient.update();
     lastTimeUpdate = millis();
   }
-  byte minutes = timeClient.getSeconds(); // timeClient.getMinutes() % 60; // ((timeClient.getMinutes() * 60) + timeClient.getSeconds());
-  byte hour = timeClient.getMinutes() % 24; // timeClient.getHours() % 24;
-  brightness = map(minutes, 0, 60, time_brightness[hour], time_brightness[(hour + 1) % 24]);
+  byte minutes = timeClient.getMinutes() % 60;
+  byte hour = timeClient.getHours() % 24;
+  brightness = map(minutes, 0, 60, time_brightness[(hour + TIMEZONE_OFFSET) % 24], time_brightness[(hour + TIMEZONE_OFFSET + 1) % 24]);
   hue = map(
       minutes, 0, 60, 
-      (unsigned int)(time_hue[hour] * STEP_PRECISION),
-      (unsigned int)(time_hue[(hour + 1) % 24] * STEP_PRECISION)
+      (unsigned int)(time_hue[(hour + TIMEZONE_OFFSET) % 24] * STEP_PRECISION),
+      (unsigned int)(time_hue[(hour + TIMEZONE_OFFSET + 1) % 24] * STEP_PRECISION)
     ) / STEP_PRECISION;
   if(millis() - lastTimeSend > 1000){
     webSocket.broadcastTXT("MINUTES: " + String(minutes) + " HOUR: " + String(hour));
