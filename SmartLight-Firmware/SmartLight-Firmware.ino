@@ -18,9 +18,13 @@ Date: 7 June 2020
 #define NEO_PIXELS 100
 
 // config storage
-#define configFilePath "/config.json"
+#define PATH_CONFIG_WIFI "/config.json"
 #define JSON_HOSTNAME "hn"
 #define JSON_LAMP_TYPE "lt"
+
+#define PATH_CONFIG_TIME "/time.json"
+#define JSON_TIME_BRIGHTNESS "tb"
+#define JSON_TIME_HUE "th"
 
 // current state
 #define STATE_OFF 0
@@ -153,10 +157,23 @@ WebSocketsServer webSocket = WebSocketsServer(80);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
+// JSON sizes https://arduinojson.org/v6/assistant/
 // max 25 gradient steps, 2226 Bytes, each timestamp max 7 digits, each color val max 255
 const size_t maxPayloadSize = 2*JSON_ARRAY_SIZE(25) + 26*JSON_OBJECT_SIZE(3) + 200;
-// 2 keys with each value max 32 chars long, 104 Bytes
-const size_t maxStorageSize = JSON_OBJECT_SIZE(2) + 80;
+/*
+{
+  "JSON_HOSTNAME": "abcdef",
+  "JSON_LAMP_TYPE": "test"
+}
+*/
+const size_t maxWifiConfigSize = JSON_OBJECT_SIZE(2) + 80;
+/*
+{
+  "JSON_TIME_BRIGHTNESS": 24[255],
+  "JSON_TIME_HUE": 24[100]
+}
+*/
+const size_t maxTimeConfigSize = 2*JSON_ARRAY_SIZE(24) + JSON_OBJECT_SIZE(2) + 30;
 
 struct RGB {
   byte r;
@@ -195,6 +212,10 @@ bool currentGradientLoop;
 // currentState == STATE_UNDEFINED || currentState == STATE_TIME
 byte brightness = 0;
 float hue = 0.5;
+#define TIMEZONE_OFFSET 2 // TODO: values should always be saved in UTC
+// 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
+byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 130, 40, 20, 5, 1};
+float time_hue[24] = {0.01, 0.01, 0.01, 0.02, 0.05, 0.2, 0.5, 0.8, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 0.5, 0.3, 0.1, 0.05, 0.01};
 
 /**********************************
  INIT
@@ -309,7 +330,7 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   setColor(VIOLET);
 }
 
-void setupFilesystem(){
+void setupWifiConfig() {
   #ifdef DEBUG
     Serial.println("setupFilesystem");
   #endif
@@ -332,7 +353,7 @@ void setupFilesystem(){
     Serial.println("filesystem->begin() executed");
   #endif
 
-  if(!filesystem->exists(configFilePath)) {
+  if(!filesystem->exists(PATH_CONFIG_WIFI)) {
     #ifdef DEBUG
       Serial.println("config file doesn't exist");
     #endif
@@ -343,7 +364,7 @@ void setupFilesystem(){
   #endif
 
   //file exists, reading and loading
-  File configFile = filesystem->open(configFilePath, "r");
+  File configFile = filesystem->open(PATH_CONFIG_WIFI, "r");
   if(!configFile) { return; }
   #ifdef DEBUG
     Serial.println("configfile read");
@@ -353,7 +374,7 @@ void setupFilesystem(){
   // Allocate a buffer to store contents of the file.
   std::unique_ptr<char[]> buf(new char[size]);
   configFile.readBytes(buf.get(), size);
-  DynamicJsonDocument doc(maxStorageSize);
+  DynamicJsonDocument doc(maxWifiConfigSize);
   auto error = deserializeJson(doc, buf.get());
   if(error){ return; }
   configFile.close();
@@ -381,6 +402,81 @@ void setupFilesystem(){
       Serial.println("lamptype updated");
     #endif
   }
+}
+
+void setupTimeConfig() {
+ #ifdef DEBUG
+    Serial.println("setupFilesystem");
+  #endif
+
+  #ifdef DEBUG
+    Serial.println("exec filesystem->begin()");
+  #endif
+  filesystem->begin();
+  #ifdef DEBUG
+    Serial.println("filesystem->begin() executed");
+  #endif
+
+  if(!filesystem->exists(PATH_CONFIG_TIME)) {
+    #ifdef DEBUG
+      Serial.println("config file doesn't exist");
+    #endif
+    return;
+  }
+  #ifdef DEBUG
+    Serial.println("configfile exists");
+  #endif
+
+  //file exists, reading and loading
+  File configFile = filesystem->open(PATH_CONFIG_TIME, "r");
+  if(!configFile) { return; }
+  #ifdef DEBUG
+    Serial.println("configfile read");
+  #endif
+
+  size_t size = configFile.size();
+  // Allocate a buffer to store contents of the file.
+  std::unique_ptr<char[]> buf(new char[size]);
+  configFile.readBytes(buf.get(), size);
+  DynamicJsonDocument doc(maxTimeConfigSize);
+  auto error = deserializeJson(doc, buf.get());
+  if(error){ return; }
+  configFile.close();
+
+  #ifdef DEBUG
+    Serial.println("configfile serialized");
+  #endif
+
+  // copy from config to variable
+  if(doc.containsKey(JSON_TIME_BRIGHTNESS)){
+    #ifdef DEBUG
+      Serial.println("JSON_TIME_BRIGHTNESS key read");
+    #endif
+    byte numberOfSteps = 24;
+    for (byte i = 0; i < numberOfSteps; i++) {
+      time_brightness[i] = (byte) doc[JSON_TIME_BRIGHTNESS][i];
+    }
+    #ifdef DEBUG
+      Serial.println("time brigthness updated");
+    #endif
+  }
+  if(doc.containsKey(JSON_TIME_HUE)){
+    #ifdef DEBUG
+      Serial.println("JSON_TIME_HUE key read");
+    #endif
+    byte numberOfSteps = 24;
+    for (byte i = 0; i < numberOfSteps; i++) {
+      time_hue[i] = (float) ((float)doc[JSON_TIME_HUE][i] / 100.0);
+    }
+    #ifdef DEBUG
+      Serial.println("time hue updated");
+    #endif
+  }
+}
+
+void setupFilesystem(){
+  setupWifiConfig();
+  setupTimeConfig();
 }
 
 bool shouldEnterSetup(){
@@ -442,12 +538,12 @@ void setupWifi(){
     #ifdef DEBUG
       Serial.println("write config to filesystem");
     #endif
-    DynamicJsonDocument doc(maxStorageSize);
+    DynamicJsonDocument doc(maxWifiConfigSize);
 
     doc[JSON_HOSTNAME] = setting_hostname.getValue();
     doc[JSON_LAMP_TYPE] = setting_lamptype.getValue();
 
-    File configFile = filesystem->open(configFilePath, "w");
+    File configFile = filesystem->open(PATH_CONFIG_WIFI, "w");
     serializeJson(doc, configFile);
     configFile.close();
 
@@ -843,11 +939,6 @@ void handleButton(){
 //*************************
 // time control
 //*************************
-#define TIMEZONE_OFFSET 2 // TODO: values should always be saved in UTC
-// 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
-byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 130, 40, 20, 5, 1};
-float time_hue[24] = {0.01, 0.01, 0.01, 0.02, 0.05, 0.2, 0.5, 0.8, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 0.5, 0.3, 0.1, 0.05, 0.01};
-
 #define STEP_PRECISION 10000.0
 
 unsigned long lastTimeUpdate = 0;
