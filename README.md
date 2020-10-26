@@ -36,53 +36,98 @@ To get the board configuration, enable the extended output during compilation in
 
 All Communication is done via WebSockets on Port 80
 
-### Receives
+### Control
 
-#### Set color
+All `SET` Methods here have a `GET` counterpart which only requires the `action` attribute to be present. The Server will answer with the same action name and the additional data attribute.
+
+If you send `{ "action": "GET /output/channel" }`, the server will answer with a message `{ "action": "GET /output/channel", "data": [/* value channel 1 */, /* value channel 2 */] }`
+
+#### Set Channels directly
 
 Sets all channels to the defined values.
 
 ```json
 {
-  "type": "setOutput",
-  "data": [/* value channel 1 */, /* value channel 2 */, /* value channel 3 */]
+  "action": "SET /output/channel",
+  "data": [/* value channel 1 */, /* value channel 2 */]
 }
 ```
 
-Each channel value must be an integer between 0 (inclusive) and 255 (inclusive).
+#### Set Channel Ratio
 
-#### turn on (TODO: find a better name)
-
-Enabled "time mode" which selects the current channel value based on a saved list of colors for each hour of the day. Values between hours are interpolated on a linear basis.
+Sets the ratio between the left and the right channel as a number between `0` and `100`. `50` means, that both channels will use the full brightness, `25` means `channel 1` will be twice as bright as `channel 2`.
 
 ```json
 {
-  "type": "state",
+  "action": "SET /output/ratio",
+  "data": 100
+}
+```
+
+#### Set Max Channel Brightness
+
+Sets the brightness value of the brightest channel according to the current Channel Ratio in percentage. `100` means `100%`/`max` brightness.
+
+```json
+{
+  "action": "SET /output/brightness",
+  "data": 100
+}
+```
+
+### Set brightness and ratio
+
+Sets both the channel ratio and the max channel brightness with a single message.
+Check `Set Channel Ratio` and `Set Brightness` for details.
+
+```json
+{
+  "action": "SET /output/brightness-and-ratio",
+  "data": [/* brightness */, /* ratio */]
+}
+```
+
+### Set Toggle Power State
+
+Turns all channels on or off. If toggled on, the time based light settings are used
+
+`0`: Off
+`1`: On
+
+```json
+{
+  "action": "SET /output/power",
+  "data": 1
+}
+```
+
+### Settings
+
+### Set daylight Settings
+
+Sets the channel max brightness and channel ratio for each hour of the day. Starting with 00:00 UTC.
+Also sets the UTC timezone offset in minutes.
+
+```json
+{
+  "action": "SET /settings/daylight",
   "data": {
-    "type": "time"
+    "ratio": [], // 24 values between 0 and 100
+    "brightness": [], // 24 values between 0 and 100
+    "utcOffset": 60
   }
 }
 ```
 
-#### configure time mode
+### Set Connection Settings
 
-Enabled "time mode" which selects the current channel value based on a saved list of colors for each hour of the day. Values between hours are interpolated on a linear basis.
+Updates the saved Connection configuration.
 
 ```json
 {
-  "type": "config",
+  "action": "SET /settings/connection",
   "data": {
-    "type": "time",
-    "data": {
-      
-    }
+    "hostname": "SmartLight-[CHIP-ID]"
   }
 }
 ```
-
-### Transmits
-
-#### Current Color
-
-Broadcasts the current color on every color change to all connected devices.
-The send message uses the same interface as described in "Set color".
