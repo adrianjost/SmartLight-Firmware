@@ -104,7 +104,6 @@ char wifiPassword[32] = "";
 
 
 byte currentState = STATE_OFF;
-bool hasNewValue = false;
 
 // currentState == STATE_COLOR
 Channels currentOutput {0,0};
@@ -157,7 +156,7 @@ void setOutput(Channels ch){
 }
 
 void blink(Channels ch, byte num, int blinkDuration){
-  for (byte i = 0; i <= num; i++) {
+  for (byte i = 0; i < num; i++) {
     setOutput(ch);
     delay(blinkDuration);
     setOutput(OFF);
@@ -185,7 +184,6 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   #ifdef DEBUG
     Serial.println("start config portal");
   #endif
-  blink(ON, 3, 200);
 }
 
 void setupWifiConfig() {
@@ -465,7 +463,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             doc["color"]["2"]
           };
           currentState = STATE_COLOR;
-          hasNewValue = true;
           return;
         }
         /* LEGACY END */
@@ -473,35 +470,72 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Payload has no action\"}");
           return;
         }
-        const char* action = doc["action"];
-        if(action == "SET /output/channel") {
+        String action = String((const char*)doc["action"]);
+
+        if (action == "SET /output/channel") {
           currentOutput = {
-            (byte)((byte)doc["data"][0] * 2.55),
-            (byte)((byte)doc["data"][1] * 2.55)
+            (byte)doc["data"][0],
+            (byte)doc["data"][1]
           };
-        } else if(action == "GET /output/channel") {
+          currentState = STATE_COLOR;
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+        } else if (action == "GET /output/channel") {
           webSocket.sendTXT(num, "{\"action\":\"GET /output/channel\",\"data\":[" +
-            String((byte)(currentOutput.a / 2.55)) + "," + 
-            String((byte)(currentOutput.b / 2.55)) + "]}");
+            String(currentOutput.a) + "," +
+            String(currentOutput.b) + "]}");
+
+
+        } else if (action == "SET /output/power") {
+          if (doc["data"] == 0) {
+            currentOutput = OFF;
+            currentState = STATE_COLOR;
+          } else {
+            currentState = STATE_TIME;
+          }
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+        } else if (action == "GET /output/power") {
+          if (currentOutput.a == 0 && currentOutput.b == 0) {
+            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"data\":0}");
+          } else {
+            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"data\":1}");
+          }
+
+
+        } else if (action == "SET /output/ratio") {
+          hue = (byte)doc["data"] / 100.0;
+          updateLED();
+          currentState = STATE_COLOR;
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+        } else if (action == "GET /output/ratio") {
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/ratio\",\"data\":" + String((byte)(hue * 100)) + "}");
+
+
+        } else if (action == "SET /output/brightness") {
+          brightness = (byte)doc["data"];
+          updateLED();
+          currentState = STATE_COLOR;
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+        } else if (action == "GET /output/brightness") {
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness\",\"data\":" + String(brightness) + "}");
+
+
+        } else if (action == "SET /output/brightness-and-ratio") {
+          brightness = (byte)doc["data"][0];
+          hue = (byte)doc["data"][1] / 100.0;
+          updateLED();
+          currentState = STATE_COLOR;
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+        } else if (action == "GET /output/brightness-and-ratio") {
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"data\":[" 
+            + String(brightness) + ","
+            + String((byte)(hue * 100))
+          + "]}");
+
+
         } else {
           webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
           return;
         }
-        if(!String(action).startsWith("GET")){
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
-        }
-
-        // if(doc.containsKey("color")){
-        //   currentOutput = {
-        //     doc["color"]["1"],
-        //     doc["color"]["2"]
-        //   };
-        //   currentState = STATE_COLOR;
-        //   hasNewValue = true;
-        //   broadcastCurrentColor();
-        // }else{
-        //   webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
-        // }
       }
       break;
   }
@@ -672,7 +706,7 @@ void setByTime() {
   byte hour = timeClient.getHours() % 24;
   brightness = map(minutes, 0, 60, time_brightness[(hour + TIMEZONE_OFFSET) % 24], time_brightness[(hour + TIMEZONE_OFFSET + 1) % 24]);
   hue = map(
-      minutes, 0, 60, 
+      minutes, 0, 60,
       (unsigned int)(time_hue[(hour + TIMEZONE_OFFSET) % 24] * STEP_PRECISION),
       (unsigned int)(time_hue[(hour + TIMEZONE_OFFSET + 1) % 24] * STEP_PRECISION)
     ) / STEP_PRECISION;
@@ -709,9 +743,9 @@ void setup() {
 
   initStrip();
 
-  blink(ON, 1, 200);
+  blink(ON, 1, 300);
   setupWifi();
-  blink(ON, 2, 200);
+  blink(ON, 2, 300);
   setupOTAUpdate();
 
   setupWebsocket();
@@ -733,7 +767,6 @@ void loop() {
   switch (currentState) {
     case STATE_COLOR: {
         setOutput(currentOutput);
-        hasNewValue = false;
         currentState = STATE_UNDEFINED;
         brightness = getBrightness(currentOutput);
         hue = getHue(currentOutput);

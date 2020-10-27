@@ -45,7 +45,7 @@ Each string value is only allowed to include max. 50 characters. If you use more
 
 #### Set Channels directly
 
-Sets all channels to the defined values.
+Sets all channels to the defined values. The max value is `255`.
 
 ```json
 {
@@ -54,7 +54,7 @@ Sets all channels to the defined values.
 }
 ```
 
-#### Set Channel Ratio (TODO)
+#### Set Channel Ratio
 
 Sets the ratio between the left and the right channel as a number between `0` and `100`. `50` means, that both channels will use the full brightness, `25` means `channel 1` will be twice as bright as `channel 2`.
 
@@ -65,18 +65,18 @@ Sets the ratio between the left and the right channel as a number between `0` an
 }
 ```
 
-#### Set Max Channel Brightness (TODO)
+#### Set Max Channel Brightness
 
-Sets the brightness value of the brightest channel according to the current Channel Ratio in percentage. `100` means `100%`/`max` brightness.
+Sets the brightness value of the brightest channel according to the current Channel Ratio in percentage. `255` means `100%`/`max` brightness, `0`is equal to `off`.
 
 ```json
 {
   "action": "SET /output/brightness",
-  "data": 100
+  "data": 255
 }
 ```
 
-### Set brightness and ratio (TODO)
+### Set brightness and ratio
 
 Sets both the channel ratio and the max channel brightness with a single message.
 Check `Set Channel Ratio` and `Set Brightness` for details.
@@ -88,7 +88,7 @@ Check `Set Channel Ratio` and `Set Brightness` for details.
 }
 ```
 
-### Set Toggle Power State (TODO)
+### Set Toggle Power State
 
 Turns all channels on or off. If toggled on, the time based light settings are used
 
