@@ -75,17 +75,15 @@ WebSocketsServer webSocket = WebSocketsServer(80);
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0); // update ntp server: setPoolServerName(string)
 
 // JSON sizes https://arduinojson.org/v6/assistant/
-// { "color": { "1": 255, "2": 255, "3": 255 } }
-const size_t maxPayloadSize = JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(3) + 20;
-
-// { "JSON_HOSTNAME": "abcdef", "JSON_LAMP_TYPE": "test" }
+// { "JSON_HOSTNAME": "abcdef" }
 const size_t maxWifiConfigSize = JSON_OBJECT_SIZE(2) + 80;
+const size_t maxTimeConfigSize = 2*JSON_ARRAY_SIZE(24) + JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(4) + 140;
+// WebSocket Payload (max value is time light configuration)
+const size_t maxPayloadSize = maxTimeConfigSize;
 
-// { "JSON_TIME_BRIGHTNESS": 24[255], "JSON_TIME_HUE": 24[100] }
-const size_t maxTimeConfigSize = 2*JSON_ARRAY_SIZE(24) + JSON_OBJECT_SIZE(2) + 30;
 
 struct Channels {
   byte a;
@@ -452,36 +450,58 @@ void broadcastCurrentColor() {
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
   switch(type) {
-    case WStype_DISCONNECTED:{
-        // DISCONNECTED
-      }
-      break;
-    case WStype_CONNECTED:{
-        // CONNECTED
-        broadcastCurrentColor();
-      }
-      break;
     case WStype_TEXT:{
-        String text = String((char *) &payload[0]);
-        DynamicJsonDocument tmpStateJson(maxPayloadSize);
-        auto error = deserializeJson(tmpStateJson, text);
-
+        char* json = (char *) &payload[0];
+        DynamicJsonDocument doc(maxPayloadSize);
+        auto error = deserializeJson(doc, json);
         if (error) {
-          // ERROR parsing State
           webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Failed to parse payload\"}");
           return;
         }
-        if(tmpStateJson.containsKey("color")){
+        /* LEGACY - Should be removed when Website is updated */
+        if(doc.containsKey("color")){
           currentOutput = {
-            tmpStateJson["color"]["1"],
-            tmpStateJson["color"]["2"]
+            doc["color"]["1"],
+            doc["color"]["2"]
           };
           currentState = STATE_COLOR;
           hasNewValue = true;
-          broadcastCurrentColor();
-        }else{
-          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
+          return;
         }
+        /* LEGACY END */
+        if(!doc.containsKey("action")){
+          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Payload has no action\"}");
+          return;
+        }
+        const char* action = doc["action"];
+        if(action == "SET /output/channel") {
+          currentOutput = {
+            (byte)((byte)doc["data"][0] * 2.55),
+            (byte)((byte)doc["data"][1] * 2.55)
+          };
+        } else if(action == "GET /output/channel") {
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/channel\",\"data\":[" +
+            String((byte)(currentOutput.a / 2.55)) + "," + 
+            String((byte)(currentOutput.b / 2.55)) + "]}");
+        } else {
+          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
+          return;
+        }
+        if(!String(action).startsWith("GET")){
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+        }
+
+        // if(doc.containsKey("color")){
+        //   currentOutput = {
+        //     doc["color"]["1"],
+        //     doc["color"]["2"]
+        //   };
+        //   currentState = STATE_COLOR;
+        //   hasNewValue = true;
+        //   broadcastCurrentColor();
+        // }else{
+        //   webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
+        // }
       }
       break;
   }

@@ -39,8 +39,9 @@ All Communication is done via WebSockets on Port 80
 ### Control
 
 All `SET` Methods here have a `GET` counterpart which only requires the `action` attribute to be present. The Server will answer with the same action name and the additional data attribute.
-
 If you send `{ "action": "GET /output/channel" }`, the server will answer with a message `{ "action": "GET /output/channel", "data": [/* value channel 1 */, /* value channel 2 */] }`
+
+Each string value is only allowed to include max. 50 characters. If you use more, it's possible that the payload can not be parsed. The same issue can arise if you send additional properties.
 
 #### Set Channels directly
 
@@ -53,7 +54,7 @@ Sets all channels to the defined values.
 }
 ```
 
-#### Set Channel Ratio
+#### Set Channel Ratio (TODO)
 
 Sets the ratio between the left and the right channel as a number between `0` and `100`. `50` means, that both channels will use the full brightness, `25` means `channel 1` will be twice as bright as `channel 2`.
 
@@ -64,7 +65,7 @@ Sets the ratio between the left and the right channel as a number between `0` an
 }
 ```
 
-#### Set Max Channel Brightness
+#### Set Max Channel Brightness (TODO)
 
 Sets the brightness value of the brightest channel according to the current Channel Ratio in percentage. `100` means `100%`/`max` brightness.
 
@@ -75,7 +76,7 @@ Sets the brightness value of the brightest channel according to the current Chan
 }
 ```
 
-### Set brightness and ratio
+### Set brightness and ratio (TODO)
 
 Sets both the channel ratio and the max channel brightness with a single message.
 Check `Set Channel Ratio` and `Set Brightness` for details.
@@ -87,7 +88,7 @@ Check `Set Channel Ratio` and `Set Brightness` for details.
 }
 ```
 
-### Set Toggle Power State
+### Set Toggle Power State (TODO)
 
 Turns all channels on or off. If toggled on, the time based light settings are used
 
@@ -103,7 +104,7 @@ Turns all channels on or off. If toggled on, the time based light settings are u
 
 ### Settings
 
-### Set daylight Settings
+### Set daylight Settings (TODO)
 
 Sets the channel max brightness and channel ratio for each hour of the day. Starting with 00:00 UTC.
 Also sets the UTC timezone offset in minutes.
@@ -114,12 +115,13 @@ Also sets the UTC timezone offset in minutes.
   "data": {
     "ratio": [], // 24 values between 0 and 100
     "brightness": [], // 24 values between 0 and 100
-    "utcOffset": 60
+    "utcOffset": 60,
+    "ntpServer": "pool.ntp.org"
   }
 }
 ```
 
-### Set Connection Settings
+### Set Connection Settings (TODO)
 
 Updates the saved Connection configuration.
 
