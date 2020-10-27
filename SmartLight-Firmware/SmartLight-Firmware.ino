@@ -114,7 +114,7 @@ float hue = 0.5;
 #define TIMEZONE_OFFSET 1 // TODO: values should always be saved in UTC
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
 byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 130, 40, 20, 5, 1};
-float time_hue[24] = {0.01, 0.01, 0.01, 0.02, 0.05, 0.2, 0.5, 0.8, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 0.5, 0.3, 0.1, 0.05, 0.01};
+byte time_hue[24] = {1, 1, 1, 2, 5, 20, 50, 80, 90, 100, 100, 100, 100, 100, 100, 100, 100, 100, 80, 50, 30, 10, 5, 1};
 
 /**********************************
  INIT
@@ -311,7 +311,7 @@ void setupTimeConfig() {
     #endif
     byte numberOfSteps = 24;
     for (byte i = 0; i < numberOfSteps; i++) {
-      time_hue[i] = (float) ((float)doc[JSON_TIME_HUE][i] / 100.0);
+      time_hue[i] = (byte)doc[JSON_TIME_HUE][i];
     }
     #ifdef DEBUG
       Serial.println("time hue updated");
@@ -526,12 +526,27 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           currentState = STATE_COLOR;
           webSocket.sendTXT(num, "{\"status\":\"OK\"}");
         } else if (action == "GET /output/brightness-and-ratio") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"data\":[" 
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"data\":["
             + String(brightness) + ","
             + String((byte)(hue * 100))
           + "]}");
 
-
+        } else if (action == "GET /settings/daylight") {
+          String hueList = "";
+          String brightnessList = "";
+          for (byte i = 0; i < 24; i++) {
+            hueList += String(time_hue[i]);
+            brightnessList += String(time_brightness[i]);
+            if(i < 23){
+              hueList += ",";
+              brightnessList += ",";
+            }
+          }
+          webSocket.sendTXT(num, "{\"action\":\"SET /settings/daylight\",\"data\":{\"ratio\":["
+            + String(hueList)
+            + "],\"brightness\":["
+            + String(brightnessList)
+            + "],\"utcOffset\":60,\"ntpServer\":\"pool.ntp.org\"}}");
         } else {
           webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
           return;
@@ -707,8 +722,8 @@ void setByTime() {
   brightness = map(minutes, 0, 60, time_brightness[(hour + TIMEZONE_OFFSET) % 24], time_brightness[(hour + TIMEZONE_OFFSET + 1) % 24]);
   hue = map(
       minutes, 0, 60,
-      (unsigned int)(time_hue[(hour + TIMEZONE_OFFSET) % 24] * STEP_PRECISION),
-      (unsigned int)(time_hue[(hour + TIMEZONE_OFFSET + 1) % 24] * STEP_PRECISION)
+      (unsigned int)((time_hue[(hour + TIMEZONE_OFFSET) % 24] / 100.0) * STEP_PRECISION),
+      (unsigned int)((time_hue[(hour + TIMEZONE_OFFSET + 1) % 24] / 100.0)* STEP_PRECISION)
     ) / STEP_PRECISION;
   if(millis() - lastTimeSend > 1000){
     webSocket.broadcastTXT("MINUTES: " + String(minutes) + " HOUR: " + String(hour));
