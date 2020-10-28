@@ -75,7 +75,7 @@ WebSocketsServer webSocket = WebSocketsServer(80);
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 0); // update ntp server: setPoolServerName(string)
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
 // JSON sizes https://arduinojson.org/v6/assistant/
 // { "JSON_HOSTNAME": "abcdef" }
@@ -111,10 +111,11 @@ Channels currentOutput {0,0};
 // currentState == STATE_UNDEFINED || currentState == STATE_TIME
 byte brightness = 0;
 float hue = 0.5;
-#define TIMEZONE_OFFSET 1 // TODO: values should always be saved in UTC
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
 byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 130, 40, 20, 5, 1};
 byte time_hue[24] = {1, 1, 1, 2, 5, 20, 50, 80, 90, 100, 100, 100, 100, 100, 100, 100, 100, 100, 80, 50, 30, 10, 5, 1};
+int time_utc_offset = 0;
+const char* time_server = "pool.ntp.org";
 
 /**********************************
  INIT
@@ -546,7 +547,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             + String(hueList)
             + "],\"brightness\":["
             + String(brightnessList)
-            + "],\"utcOffset\":60,\"ntpServer\":\"pool.ntp.org\"}}");
+            + "],\"utcOffset\":"
+            + String(time_utc_offset)
+            + ",\"ntpServer\":\""
+            + String(time_server)
+            + "\"}}");
         } else {
           webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
           return;
@@ -714,16 +719,18 @@ unsigned long lastTimeUpdate = 0;
 unsigned long lastTimeSend = 0;
 void setByTime() {
   if(millis() - lastTimeUpdate > DURATION_MINUTE * 5){
+    timeClient.setTimeOffset(time_utc_offset * 60); // TODO: move to initialization routine and save time config callback
+    timeClient.setPoolServerName(time_server); // TODO: move to initialization routine and save time config callback
     timeClient.update();
     lastTimeUpdate = millis();
   }
   byte minutes = timeClient.getMinutes() % 60;
   byte hour = timeClient.getHours() % 24;
-  brightness = map(minutes, 0, 60, time_brightness[(hour + TIMEZONE_OFFSET) % 24], time_brightness[(hour + TIMEZONE_OFFSET + 1) % 24]);
+  brightness = map(minutes, 0, 60, time_brightness[(hour) % 24], time_brightness[(hour + 1) % 24]);
   hue = map(
       minutes, 0, 60,
-      (unsigned int)((time_hue[(hour + TIMEZONE_OFFSET) % 24] / 100.0) * STEP_PRECISION),
-      (unsigned int)((time_hue[(hour + TIMEZONE_OFFSET + 1) % 24] / 100.0)* STEP_PRECISION)
+      (unsigned int)((time_hue[(hour) % 24] / 100.0) * STEP_PRECISION),
+      (unsigned int)((time_hue[(hour + 1) % 24] / 100.0)* STEP_PRECISION)
     ) / STEP_PRECISION;
   if(millis() - lastTimeSend > 1000){
     webSocket.broadcastTXT("MINUTES: " + String(minutes) + " HOUR: " + String(hour));

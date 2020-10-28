@@ -115,7 +115,7 @@ Also sets the UTC timezone offset in minutes.
   "data": {
     "ratio": [], // 24 values between 0 and 100
     "brightness": [], // 24 values between 0 and 100
-    "utcOffset": 60,
+    "utcOffset": 60, // in minutes
     "ntpServer": "pool.ntp.org"
   }
 }
