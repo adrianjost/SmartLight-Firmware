@@ -104,7 +104,7 @@ Turns all channels on or off. If toggled on, the time based light settings are u
 
 ### Settings
 
-### Set daylight Settings (TODO)
+### Set daylight Settings
 
 Sets the channel max brightness and channel ratio for each hour of the day. Starting with 00:00 UTC.
 Also sets the UTC timezone offset in minutes.
@@ -114,7 +114,7 @@ Also sets the UTC timezone offset in minutes.
   "action": "SET /settings/daylight",
   "data": {
     "ratio": [], // 24 values between 0 and 100
-    "brightness": [], // 24 values between 0 and 100
+    "brightness": [], // 24 values between 0 and 255
     "utcOffset": 60, // in minutes
     "ntpServer": "pool.ntp.org"
   }

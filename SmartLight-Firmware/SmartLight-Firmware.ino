@@ -112,10 +112,10 @@ Channels currentOutput {0,0};
 byte brightness = 0;
 float hue = 0.5;
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
-byte time_brightness[24] = {1, 1, 3, 5, 13, 51, 128, 204, 230, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 130, 40, 20, 5, 1};
-byte time_hue[24] = {1, 1, 1, 2, 5, 20, 50, 80, 90, 100, 100, 100, 100, 100, 100, 100, 100, 100, 80, 50, 30, 10, 5, 1};
+byte time_brightness[24] = {1,1,3,5,13,51,128,204,230,255,255,255,255,255,255,255,255,255,255,130,40,25,15,3};
+byte time_hue[24] = {1,1,1,2,5,10,20,40,50,60,70,70,70,70,70,70,70,70,50,30,20,10,5,1};
 int time_utc_offset = 0;
-const char* time_server = "pool.ntp.org";
+char* time_server = "pool.ntp.org";
 
 /**********************************
  INIT
@@ -251,72 +251,54 @@ void setupWifiConfig() {
 }
 
 void setupTimeConfig() {
- #ifdef DEBUG
-    Serial.println("setupFilesystem");
-  #endif
-
-  #ifdef DEBUG
-    Serial.println("exec filesystem->begin()");
-  #endif
   filesystem->begin();
-  #ifdef DEBUG
-    Serial.println("filesystem->begin() executed");
-  #endif
-
   if(!filesystem->exists(PATH_CONFIG_TIME)) {
     #ifdef DEBUG
       Serial.println("config file doesn't exist");
     #endif
     return;
   }
-  #ifdef DEBUG
-    Serial.println("configfile exists");
-  #endif
-
   //file exists, reading and loading
   File configFile = filesystem->open(PATH_CONFIG_TIME, "r");
-  if(!configFile) { return; }
-  #ifdef DEBUG
-    Serial.println("configfile read");
-  #endif
+  if(!configFile) {
+    #ifdef DEBUG
+      Serial.println("config file is empty");
+    #endif
+    return;
+  }
 
   size_t size = configFile.size();
-  // Allocate a buffer to store contents of the file.
   std::unique_ptr<char[]> buf(new char[size]);
   configFile.readBytes(buf.get(), size);
   DynamicJsonDocument doc(maxTimeConfigSize);
   auto error = deserializeJson(doc, buf.get());
-  if(error){ return; }
+  if(error){
+    #ifdef DEBUG
+      Serial.println("failed to parse config file");
+    #endif
+    return; }
   configFile.close();
 
-  #ifdef DEBUG
-    Serial.println("configfile serialized");
-  #endif
-
   // copy from config to variable
-  if(doc.containsKey(JSON_TIME_BRIGHTNESS)){
-    #ifdef DEBUG
-      Serial.println("JSON_TIME_BRIGHTNESS key read");
-    #endif
+  if(doc.containsKey("brightness")){
     byte numberOfSteps = 24;
     for (byte i = 0; i < numberOfSteps; i++) {
-      time_brightness[i] = (byte) doc[JSON_TIME_BRIGHTNESS][i];
+      time_brightness[i] = (byte) doc["brightness"][i];
     }
-    #ifdef DEBUG
-      Serial.println("time brigthness updated");
-    #endif
   }
-  if(doc.containsKey(JSON_TIME_HUE)){
-    #ifdef DEBUG
-      Serial.println("JSON_TIME_HUE key read");
-    #endif
+  if(doc.containsKey("ratio")){
     byte numberOfSteps = 24;
     for (byte i = 0; i < numberOfSteps; i++) {
-      time_hue[i] = (byte)doc[JSON_TIME_HUE][i];
+      time_hue[i] = (byte)doc["ratio"][i];
     }
-    #ifdef DEBUG
-      Serial.println("time hue updated");
-    #endif
+  }
+  if(doc.containsKey("ntpServer")){
+    strcpy(time_server, doc["ntpServer"]);
+    timeClient.setPoolServerName(time_server);
+  }
+  if(doc.containsKey("utcOffset")){
+    time_utc_offset = (int)doc["utcOffset"];
+    timeClient.setTimeOffset(time_utc_offset * 60);
   }
 }
 
@@ -532,6 +514,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             + String((byte)(hue * 100))
           + "]}");
 
+
+        } else if (action == "SET /settings/daylight") {
+          File configFile = filesystem->open(PATH_CONFIG_TIME, "w");
+          serializeJson(doc["data"], configFile);
+          configFile.close();
+          setupTimeConfig();
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
         } else if (action == "GET /settings/daylight") {
           String hueList = "";
           String brightnessList = "";
@@ -552,6 +541,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             + ",\"ntpServer\":\""
             + String(time_server)
             + "\"}}");
+
+
         } else {
           webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
           return;
@@ -719,8 +710,6 @@ unsigned long lastTimeUpdate = 0;
 unsigned long lastTimeSend = 0;
 void setByTime() {
   if(millis() - lastTimeUpdate > DURATION_MINUTE * 5){
-    timeClient.setTimeOffset(time_utc_offset * 60); // TODO: move to initialization routine and save time config callback
-    timeClient.setPoolServerName(time_server); // TODO: move to initialization routine and save time config callback
     timeClient.update();
     lastTimeUpdate = millis();
   }
