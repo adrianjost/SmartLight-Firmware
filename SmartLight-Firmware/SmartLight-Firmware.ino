@@ -422,10 +422,6 @@ void setupOTAUpdate(){
 // websocket communication
 //*************************
 
-void broadcastCurrentColor() {
-  webSocket.broadcastTXT("{\"color\":{\"1\":" + String(currentOutput.a) + ",\"2\":" + String(currentOutput.b) + "}}");
-}
-
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
   switch(type) {
     case WStype_TEXT:{
@@ -734,9 +730,6 @@ void setByTime() {
       (unsigned int)((time_hue[(hour + 1) % 24] / 100.0)* STEP_PRECISION)
     ) / STEP_PRECISION;
   if(millis() - lastTimeSend > 1000){
-    webSocket.broadcastTXT("MINUTES: " + String(minutes) + " HOUR: " + String(hour));
-    webSocket.broadcastTXT("BRIGHTNESS: " + String(brightness) + " HUE: " + String(hue));
-    broadcastCurrentColor();
     lastTimeSend = millis();
   }
   updateLED();
