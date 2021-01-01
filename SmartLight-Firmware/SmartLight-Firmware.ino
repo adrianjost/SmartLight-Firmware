@@ -115,7 +115,7 @@ float hue = 0.5;
 byte time_brightness[24] = {1,1,3,5,13,51,128,204,230,255,255,255,255,255,255,255,255,255,180,100,40,25,15,3};
 byte time_hue[24] = {0,0,0,2,5,10,20,40,50,60,70,70,70,70,70,70,70,50,30,20,0,0,0,0};
 int time_utc_offset = 0;
-char* time_server = "pool.ntp.org";
+char* time_server = (char *)"pool.ntp.org";
 
 /**********************************
  INIT
