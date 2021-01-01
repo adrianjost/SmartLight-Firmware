@@ -13,7 +13,7 @@ I recommend the Arduino VSCode Extension to trigger builds and uploads directly 
 
 ### `.vscode/settings.json`
 
-```json
+```js
 {
   // Your Path to the Arduino directory
   "arduino.path": "C:/Programme (Portable)/arduino-1.8.10"
@@ -24,7 +24,7 @@ I recommend the Arduino VSCode Extension to trigger builds and uploads directly 
 
 To get the board configuration, enable the extended output during compilation in the arduino IDE, then copy the output of the first line and select the part starting with `-fqbn=esp8266:esp8266:generic:`
 
-```json
+```js
 {
     "sketch": "SmartLight-Firmware\\SmartLight-Firmware.ino",
     "board": "esp8266:esp8266:generic",
@@ -36,92 +36,102 @@ To get the board configuration, enable the extended output during compilation in
 
 All Communication is done via WebSockets on Port 80
 
-### Receives
+### Control
 
-#### Set color
+All `SET` Methods here have a `GET` counterpart which only requires the `action` attribute to be present. The Server will answer with the same action name and the additional data attribute.
+If you send `{ "action": "GET /output/channel" }`, the server will answer with a message `{ "action": "GET /output/channel", "data": [/* value channel 1 */, /* value channel 2 */] }`
 
-Sets all channels to the defined values.
+Each string value is only allowed to include max. 50 characters. If you use more, it's possible that the payload can not be parsed. The same issue can arise if you send additional properties.
 
-```json
+#### Set Channels directly
+
+Sets all channels to the defined values. The max value is `255`.
+
+```js
 {
-  "type": "state",
+  "action": "SET /output/channel",
+  "data": [/* value channel 1 */, /* value channel 2 */]
+}
+```
+
+#### Set Channel Ratio
+
+Sets the ratio between the left and the right channel as a number between `0` and `100`. `50` means, that both channels will use the full brightness, `25` means `channel 1` will be twice as bright as `channel 2`.
+
+```js
+{
+  "action": "SET /output/ratio",
+  "data": 100
+}
+```
+
+#### Set Max Channel Brightness
+
+Sets the brightness value of the brightest channel according to the current Channel Ratio in percentage. `255` means `100%`/`max` brightness, `0`is equal to `off`.
+
+```js
+{
+  "action": "SET /output/brightness",
+  "data": 255
+}
+```
+
+### Set brightness and ratio
+
+Sets both the channel ratio and the max channel brightness with a single message.
+Check `Set Channel Ratio` and `Set Brightness` for details.
+
+```js
+{
+  "action": "SET /output/brightness-and-ratio",
+  "data": [/* brightness */, /* ratio */]
+}
+```
+
+### Set Toggle Power State
+
+Turns all channels on or off. If toggled on, the time based light settings are used
+
+`0`: Off
+`1`: On
+
+```js
+{
+  "action": "SET /output/power",
+  "data": 1
+}
+```
+
+### Settings
+
+### Set daylight Settings
+
+Sets the channel max brightness and channel ratio for each hour of the day. Starting with 00:00 UTC.
+Also sets the UTC timezone offset in minutes.
+
+```js
+{
+  "action": "SET /settings/daylight",
   "data": {
-    "type": "color",
-    "data": [/* value channel 1 */, /* value channel 2 */, /* value channel 3 */]
+    "ratio": [], // 24 values between 0 and 100
+    "brightness": [], // 24 values between 0 and 255
+    "utcOffset": 60, // in minutes
+    "ntpServer": "pool.ntp.org"
   }
 }
 ```
 
-Each channel value must be an integer between 0 (inclusive) and 255 (inclusive).
+### Set Connection Settings
 
-#### Set gradient
+Updates the saved Connection configuration.
 
-Switches to gradient mode and fades between given colors according to the given configuration.
+> ⚠️ **The Device will automatically reboot** after confirming the message to apply the changes. Your current connection will be closed and you need to reconnect.
 
-```json
+```js
 {
-  "type": "state",
+  "action": "SET /settings/connection",
   "data": {
-    "type": "gradient",
-    "data": {
-      "colors": [
-        // List of Colors, check the "Set color" section. The interface is identical
-        // ...
-      ],
-      "transitionTimes": [/* duration of color n in ms as integer */], // check comment 1
-      "loop": true // check comment 2
-    }
+    "hostname": "SmartLight-[CHIP-ID]"
   }
 }
 ```
-
-Comment 1: a colorTimestamp n declares when the nth color should be fully visible in milliseconds (1s = 1000ms).
-In the given example, we start with a red color at 0s and transition smoothly to blue.
-After 10s we are showing a solid blue color and begin fading to the 3th color (red).
-After 10 more seconds (20s in total) we are showing full red again.
-! the first value must be 0 and the total number of transitionTimes must be equal to the number of gradient colors. !
-
-Comment 2: the loop option declares whether the gradient should start again when reaching the last color.
-We do not do any type of fading here!
-To make this transition smooth your gradient should start and end with the same colors.
-
-#### turn on (TODO: find a better name)
-
-Enabled "time mode" which selects the current channel value based on a saved list of colors for each hour of the day. Values between hours are interpolated on a linear basis.
-
-```json
-{
-  "type": "state",
-  "data": {
-    "type": "time"
-  }
-}
-```
-
-#### configure time mode
-
-Enabled "time mode" which selects the current channel value based on a saved list of colors for each hour of the day. Values between hours are interpolated on a linear basis.
-
-```json
-{
-  "type": "config",
-  "data": {
-    "type": "time",
-    "data": {
-      
-    }
-  }
-}
-```
-
-### Transmits
-
-#### Current Color
-
-Broadcasts the current color on every color change to all connected devices.
-The send message uses the same interface as described in "Set color".
-
-#### ~Current Gradient~ (not yet implemented)
-
-Broadcasts the current gradient whenever a new gradient is set to all connected devices.
-The send message uses the same interface as described in "Set gradient".
