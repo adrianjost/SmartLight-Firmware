@@ -13,7 +13,7 @@ I recommend the Arduino VSCode Extension to trigger builds and uploads directly 
 
 ### `.vscode/settings.json`
 
-```json
+```js
 {
   // Your Path to the Arduino directory
   "arduino.path": "C:/Programme (Portable)/arduino-1.8.10"
@@ -24,7 +24,7 @@ I recommend the Arduino VSCode Extension to trigger builds and uploads directly 
 
 To get the board configuration, enable the extended output during compilation in the arduino IDE, then copy the output of the first line and select the part starting with `-fqbn=esp8266:esp8266:generic:`
 
-```json
+```js
 {
     "sketch": "SmartLight-Firmware\\SmartLight-Firmware.ino",
     "board": "esp8266:esp8266:generic",
@@ -47,7 +47,7 @@ Each string value is only allowed to include max. 50 characters. If you use more
 
 Sets all channels to the defined values. The max value is `255`.
 
-```json
+```js
 {
   "action": "SET /output/channel",
   "data": [/* value channel 1 */, /* value channel 2 */]
@@ -58,7 +58,7 @@ Sets all channels to the defined values. The max value is `255`.
 
 Sets the ratio between the left and the right channel as a number between `0` and `100`. `50` means, that both channels will use the full brightness, `25` means `channel 1` will be twice as bright as `channel 2`.
 
-```json
+```js
 {
   "action": "SET /output/ratio",
   "data": 100
@@ -69,7 +69,7 @@ Sets the ratio between the left and the right channel as a number between `0` an
 
 Sets the brightness value of the brightest channel according to the current Channel Ratio in percentage. `255` means `100%`/`max` brightness, `0`is equal to `off`.
 
-```json
+```js
 {
   "action": "SET /output/brightness",
   "data": 255
@@ -81,7 +81,7 @@ Sets the brightness value of the brightest channel according to the current Chan
 Sets both the channel ratio and the max channel brightness with a single message.
 Check `Set Channel Ratio` and `Set Brightness` for details.
 
-```json
+```js
 {
   "action": "SET /output/brightness-and-ratio",
   "data": [/* brightness */, /* ratio */]
@@ -95,7 +95,7 @@ Turns all channels on or off. If toggled on, the time based light settings are u
 `0`: Off
 `1`: On
 
-```json
+```js
 {
   "action": "SET /output/power",
   "data": 1
@@ -109,7 +109,7 @@ Turns all channels on or off. If toggled on, the time based light settings are u
 Sets the channel max brightness and channel ratio for each hour of the day. Starting with 00:00 UTC.
 Also sets the UTC timezone offset in minutes.
 
-```json
+```js
 {
   "action": "SET /settings/daylight",
   "data": {
@@ -125,7 +125,7 @@ Also sets the UTC timezone offset in minutes.
 
 Updates the saved Connection configuration.
 
-```json
+```js
 {
   "action": "SET /settings/connection",
   "data": {
