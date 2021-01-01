@@ -30,12 +30,12 @@ Date: 7 June 2020
 #define STATE_TIME 3
 
 // button control
-#define TIMEOUT 500
+#define SHORT_PRESS_TIMEOUT 750
 #define TIMEOUT_INFINITY 60000 // 1min
 #define BRIGHTNESS_MIN 0
 #define BRIGHTNESS_MAX 255
 #define BRIGHNESS_STEP 1
-#define BRIGHNESS_STEP_DURATION 90
+#define BRIGHNESS_STEP_DURATION 75
 #define HUE_MIN 0
 #define HUE_MAX 1
 #define HUE_STEP 0.01
@@ -561,6 +561,9 @@ void setupWebsocket(){
 // button control
 //*************************
 
+#define TOUCHED true
+#define RELEASED false
+
 Channels floatChtoCh(FloatChannels color){
   return Channels {
     (byte)color.a,
@@ -585,7 +588,7 @@ void updateLED() {
   setOutput(currentOutput);
 }
 
-bool isBtn(bool state = true, unsigned long debounceDuration = 50) {
+bool isBtn(bool state = TOUCHED, unsigned long debounceDuration = 50) {
   // debounce
   unsigned long touchStart = millis();
   unsigned long match = 0;
@@ -602,7 +605,7 @@ bool isBtn(bool state = true, unsigned long debounceDuration = 50) {
   return (match >= noMatch);
 }
 
-bool waitForBtn(int ms, bool state = true) {
+bool waitForBtn(int ms, bool state = TOUCHED) {
   if(ms == 0){
     return isBtn(state, 0);
   }
@@ -640,17 +643,17 @@ float getBrightness(Channels ch) {
 }
 
 void handleButton(){
-  if (waitForBtn(0, true)) {
-    if (waitForBtn(TIMEOUT, false)) {
-      if (waitForBtn(TIMEOUT, true)) {
-        if (waitForBtn(TIMEOUT, false)) {
-          if (waitForBtn(TIMEOUT, true)) {
-            if (waitForBtn(TIMEOUT, false)) {
-              if (waitForBtn(TIMEOUT, true) && !waitForBtn(TIMEOUT, false)) {
+  if (waitForBtn(0, TOUCHED)) {
+    if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+      if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED)) {
+        if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+          if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED)) {
+            if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+              if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED) && !waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
                 // tap tap tap hold
                 currentState = STATE_UNDEFINED;
                 // cycle hue +
-                while (hue + HUE_STEP <= HUE_MAX && isBtn(true, HUE_STEP_DURATION)) {
+                while (hue + HUE_STEP <= HUE_MAX && isBtn(TOUCHED, HUE_STEP_DURATION)) {
                   hue += HUE_STEP;
                   updateLED();
                 }
@@ -659,7 +662,7 @@ void handleButton(){
               // tap tap hold
               currentState = STATE_UNDEFINED;
               // cycle hue -
-              while (hue - HUE_STEP >= HUE_MIN && isBtn(true, HUE_STEP_DURATION)) {
+              while (hue - HUE_STEP >= HUE_MIN && isBtn(TOUCHED, HUE_STEP_DURATION)) {
                 hue -= HUE_STEP;
                 updateLED();
               }
@@ -671,7 +674,7 @@ void handleButton(){
           // tap, hold
           currentState = STATE_UNDEFINED;
           // increase brightness
-          while (brightness + BRIGHNESS_STEP <= BRIGHTNESS_MAX && isBtn(true, BRIGHNESS_STEP_DURATION)) {
+          while (brightness + BRIGHNESS_STEP <= BRIGHTNESS_MAX && isBtn(TOUCHED, BRIGHNESS_STEP_DURATION)) {
             brightness += BRIGHNESS_STEP;
             updateLED();
           }
@@ -692,12 +695,12 @@ void handleButton(){
       // hold
       currentState = STATE_UNDEFINED;
       // reduce brightness
-      while (brightness - BRIGHNESS_STEP >= BRIGHTNESS_MIN && isBtn(true, BRIGHNESS_STEP_DURATION)) {
+      while (brightness - BRIGHNESS_STEP >= BRIGHTNESS_MIN && isBtn(TOUCHED, BRIGHNESS_STEP_DURATION)) {
         brightness -= BRIGHNESS_STEP;
         updateLED();
       }
     }
-    waitForBtn(TIMEOUT_INFINITY, false);
+    waitForBtn(TIMEOUT_INFINITY, RELEASED);
   }
 }
 
