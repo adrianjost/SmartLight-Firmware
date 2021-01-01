@@ -121,9 +121,11 @@ Also sets the UTC timezone offset in minutes.
 }
 ```
 
-### Set Connection Settings (TODO)
+### Set Connection Settings
 
 Updates the saved Connection configuration.
+
+> ⚠️ **The Device will automatically reboot** after confirming the message to apply the changes. Your current connection will be closed and you need to reconnect.
 
 ```js
 {

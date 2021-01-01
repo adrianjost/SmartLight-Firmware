@@ -12,9 +12,6 @@ Date: 7 June 2020
 
 // config storage
 #define PATH_CONFIG_WIFI "/config.json"
-#define JSON_HOSTNAME "hn"
-#define JSON_LAMP_TYPE "lt"
-
 #define PATH_CONFIG_TIME "/time.json"
 #define JSON_TIME_BRIGHTNESS "tb"
 #define JSON_TIME_HUE "th"
@@ -78,7 +75,7 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
 // JSON sizes https://arduinojson.org/v6/assistant/
-// { "JSON_HOSTNAME": "abcdef" }
+// { "hostname": "abcdef" }
 const size_t maxWifiConfigSize = JSON_OBJECT_SIZE(2) + 80;
 const size_t maxTimeConfigSize = 2*JSON_ARRAY_SIZE(24) + JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(4) + 140;
 // WebSocket Payload (max value is time light configuration)
@@ -239,11 +236,11 @@ void setupWifiConfig() {
   #endif
 
   // copy from config to variable
-  if(doc.containsKey(JSON_HOSTNAME)){
+  if(doc.containsKey("hostname")){
     #ifdef DEBUG
-      Serial.println("JSON_HOSTNAME key read");
+      Serial.println("hostname key read");
     #endif
-    strcpy(hostname, doc[JSON_HOSTNAME]);
+    strcpy(hostname, doc["hostname"]);
     #ifdef DEBUG
       Serial.println("hostname updated");
     #endif
@@ -349,7 +346,7 @@ void setupWifi(){
 
   wm.setHostname(hostname);
 
-  WiFiManagerParameter setting_hostname(JSON_HOSTNAME, "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
+  WiFiManagerParameter setting_hostname("hostname", "Devicename: (e.g. <code>smartlight-kitchen</code>)", hostname, 32);
   wm.addParameter(&setting_hostname);
 
   bool forceSetup = shouldEnterSetup();
@@ -363,7 +360,7 @@ void setupWifi(){
     #endif
     DynamicJsonDocument doc(maxWifiConfigSize);
 
-    doc[JSON_HOSTNAME] = setting_hostname.getValue();
+    doc["hostname"] = setting_hostname.getValue();
 
     File configFile = filesystem->open(PATH_CONFIG_WIFI, "w");
     serializeJson(doc, configFile);
@@ -532,7 +529,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
               brightnessList += ",";
             }
           }
-          webSocket.sendTXT(num, "{\"action\":\"SET /settings/daylight\",\"data\":{\"ratio\":["
+          webSocket.sendTXT(num, "{\"action\":\"GET /settings/daylight\",\"data\":{\"ratio\":["
             + String(hueList)
             + "],\"brightness\":["
             + String(brightnessList)
@@ -540,6 +537,18 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             + String(time_utc_offset)
             + ",\"ntpServer\":\""
             + String(time_server)
+            + "\"}}");
+
+
+        } else if (action == "SET /settings/connection") {
+          File configFile = filesystem->open(PATH_CONFIG_WIFI, "w");
+          serializeJson(doc["data"], configFile);
+          configFile.close();
+          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          ESP.restart();
+        } else if (action == "GET /settings/connection") {
+          webSocket.sendTXT(num, "{\"action\":\"GET /settings/connection\",\"data\":{\"hostname\":"
+            + String(hostname)
             + "\"}}");
 
 
