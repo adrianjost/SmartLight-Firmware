@@ -153,8 +153,8 @@ void setOutput(Channels ch){
   #endif
 }
 
-void blink(Channels ch, byte num, int blinkDuration){
-  for (byte i = 0; i < num; i++) {
+void blink(Channels ch, byte numberOfBlinks, int blinkDuration){
+  for (byte i = 0; i < numberOfBlinks; i++) {
     setOutput(ch);
     delay(blinkDuration);
     setOutput(OFF);
