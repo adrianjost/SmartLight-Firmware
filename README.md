@@ -135,3 +135,7 @@ Updates the saved Connection configuration.
   }
 }
 ```
+
+## OTA Updates
+
+You can update the firmware using OTA-Updates (Over-The-Air Updates) so you don't need to connect the device physically to your PC. The [ArduinoOTA-Package](https://github.com/jandrassy/ArduinoOTA) is used for this, so please refer to [this documentation how to setup this update process](https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html#arduino-ide). If you are prompted for the device password, please use the WiFi password from the WiFi the device is connected to.
