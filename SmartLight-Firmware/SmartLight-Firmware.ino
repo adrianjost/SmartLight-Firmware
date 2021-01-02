@@ -32,11 +32,11 @@ Date: 7 June 2020
 #define BRIGHTNESS_MIN 0
 #define BRIGHTNESS_MAX 255
 #define BRIGHNESS_STEP 1
-#define BRIGHNESS_STEP_DURATION 75
+#define BRIGHNESS_STEP_DURATION 15
 #define HUE_MIN 0
 #define HUE_MAX 1
 #define HUE_STEP 0.01
-#define HUE_STEP_DURATION 120
+#define HUE_STEP_DURATION 70
 
 // Durations in ms
 #define DURATION_MINUTE 60000
@@ -597,7 +597,7 @@ void updateLED() {
   setOutput(currentOutput);
 }
 
-bool isBtn(bool state = TOUCHED, unsigned long debounceDuration = 50) {
+bool isBtn(bool state = TOUCHED, unsigned long debounceDuration = 75) {
   // debounce
   unsigned long touchStart = millis();
   unsigned long match = 0;
@@ -608,10 +608,9 @@ bool isBtn(bool state = TOUCHED, unsigned long debounceDuration = 50) {
     }else{
       noMatch += 1;
     }
-    // TODO: use min method instead of ternariy operator
-    delay(debounceDuration < 5 ? debounceDuration : 5);
+    delay(min(debounceDuration, (unsigned long)5));
   } while(millis() - touchStart < debounceDuration);
-  return (match >= noMatch);
+  return (match >= noMatch * 2);
 }
 
 bool waitForBtn(int ms, bool state = TOUCHED) {
