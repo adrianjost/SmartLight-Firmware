@@ -154,6 +154,8 @@ void setOutput(Channels ch){
 }
 
 void blink(Channels ch, byte numberOfBlinks, int blinkDuration){
+  setOutput(OFF);
+  delay(blinkDuration);
   for (byte i = 0; i < numberOfBlinks; i++) {
     setOutput(ch);
     delay(blinkDuration);
