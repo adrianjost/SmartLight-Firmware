@@ -76,7 +76,7 @@ Sets the brightness value of the brightest channel according to the current Chan
 }
 ```
 
-### Set brightness and ratio
+#### Set brightness and ratio
 
 Sets both the channel ratio and the max channel brightness with a single message.
 Check `Set Channel Ratio` and `Set Brightness` for details.
@@ -88,7 +88,7 @@ Check `Set Channel Ratio` and `Set Brightness` for details.
 }
 ```
 
-### Set Toggle Power State
+#### Set Toggle Power State
 
 Turns all channels on or off. If toggled on, the time based light settings are used
 
@@ -104,7 +104,7 @@ Turns all channels on or off. If toggled on, the time based light settings are u
 
 ### Settings
 
-### Set daylight Settings
+#### Set daylight Settings
 
 Sets the channel max brightness and channel ratio for each hour of the day. Starting with 00:00 UTC.
 Also sets the UTC timezone offset in minutes.
@@ -121,7 +121,7 @@ Also sets the UTC timezone offset in minutes.
 }
 ```
 
-### Set Connection Settings
+#### Set Connection Settings
 
 Updates the saved Connection configuration.
 
