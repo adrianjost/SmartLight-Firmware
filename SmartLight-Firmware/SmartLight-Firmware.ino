@@ -424,11 +424,18 @@ void setupOTAUpdate(){
 // websocket communication
 //*************************
 
-void broadcastCurrentColor() {
-  webSocket.broadcastTXT("{\"color\":{\"1\":" + String(currentOutput.a) + ",\"2\":" + String(currentOutput.b) + "}}");
+void broadcastCurrentState() {
+  // webSocket.broadcastTXT("{\"color\":{\"1\":" + String(currentOutput.a) + ",\"2\":" + String(currentOutput.b) + "}}");
+  webSocket.broadcastTXT("{\"action\":\"GET /output\",\"data\":{\"channel\":[" +
+      String(currentOutput.a) + "," + String(currentOutput.b) +
+    "],\"brightness\":" + String(brightness) +
+    ",\"ratio\":" + String((byte)(hue * 100)) +
+    ",\"power\":" + ((currentOutput.a == 0 && currentOutput.b == 0) ? "false" : "true") +
+    ",\"time\":\"" + String(timeClient.getHours() % 24) + ":" + String(timeClient.getMinutes() % 60) +
+    "\"}");
 }
 
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_TEXT:{
         char* json = (char *) &payload[0];
@@ -461,6 +468,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           };
           currentState = STATE_COLOR;
           webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          broadcastCurrentState();
         } else if (action == "GET /output/channel") {
           webSocket.sendTXT(num, "{\"action\":\"GET /output/channel\",\"data\":[" +
             String(currentOutput.a) + "," +
@@ -475,6 +483,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             currentState = STATE_TIME;
           }
           webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          broadcastCurrentState();
         } else if (action == "GET /output/power") {
           if (currentOutput.a == 0 && currentOutput.b == 0) {
             webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"data\":0}");
@@ -488,6 +497,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           updateLED();
           currentState = STATE_COLOR;
           webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          broadcastCurrentState();
         } else if (action == "GET /output/ratio") {
           webSocket.sendTXT(num, "{\"action\":\"GET /output/ratio\",\"data\":" + String((byte)(hue * 100)) + "}");
 
@@ -497,6 +507,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           updateLED();
           currentState = STATE_COLOR;
           webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          broadcastCurrentState();
         } else if (action == "GET /output/brightness") {
           webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness\",\"data\":" + String(brightness) + "}");
 
@@ -507,6 +518,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
           updateLED();
           currentState = STATE_COLOR;
           webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          broadcastCurrentState();
         } else if (action == "GET /output/brightness-and-ratio") {
           webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"data\":["
             + String(brightness) + ","
@@ -735,9 +747,7 @@ void setByTime() {
       (unsigned int)((time_hue[(hour + 1) % 24] / 100.0)* STEP_PRECISION)
     ) / STEP_PRECISION;
   if(millis() - lastTimeSend > 1000){
-    webSocket.broadcastTXT("MINUTES: " + String(minutes) + " HOUR: " + String(hour));
-    webSocket.broadcastTXT("BRIGHTNESS: " + String(brightness) + " HUE: " + String(hue));
-    broadcastCurrentColor();
+    broadcastCurrentState();
     lastTimeSend = millis();
   }
   updateLED();
