@@ -432,7 +432,7 @@ void broadcastCurrentState() {
     ",\"ratio\":" + String((byte)(hue * 100)) +
     ",\"power\":" + ((currentOutput.a == 0 && currentOutput.b == 0) ? "false" : "true") +
     ",\"time\":\"" + String(timeClient.getHours() % 24) + ":" + String(timeClient.getMinutes() % 60) +
-    "\"}");
+    "\"}}");
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
