@@ -452,6 +452,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             doc["color"]["2"]
           };
           currentState = STATE_COLOR;
+          broadcastCurrentState();
           return;
         }
         /* LEGACY END */
