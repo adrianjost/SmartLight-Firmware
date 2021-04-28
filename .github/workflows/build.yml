@@ -1,0 +1,23 @@
+name: Build
+on: [push]
+ 
+jobs:
+  firmware:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1.0.0
+      - name: Install platform
+        run: |
+          arduino-cli core update-index --config-file ./arduino-cli.yml
+          arduino-cli core install esp8266:esp8266
+      - name: Install libaries
+        run: |
+          arduino-cli lib install ArduinoJson@6.16.1
+          arduino-cli lib install WebSockets@2.1.4
+          arduino-cli lib install NTPClient@3.2.0
+          arduino-cli lib install --git-url https://github.com/tzapu/WiFiManager.git
+      - name: Compile Sketch
+        run: arduino-cli compile --fqbn esp8266:esp8266 ./SmartLight-Firmware
