@@ -43,7 +43,7 @@ If you send `{ "action": "GET /output/channel" }`, the server will answer with a
 
 Each string value is only allowed to include max. 50 characters. If you use more, it's possible that the payload can not be parsed. The same issue can arise if you send additional properties.
 
-To identify the related answer to your request, you can send add a field `id` with an integer. This `id` is included in all answers related to your request. You can use this, to filter prevent feedback loops when watching for broadcasted state messages.
+To identify the related answer to your request, you can send add a field `id` with an integer. This `id` is included in all answers related to your request. You can use this, to filter prevent feedback loops when watching for broadcasted state messages. If no `id` is given, `0` is used.
 
 #### Get Current State
 
