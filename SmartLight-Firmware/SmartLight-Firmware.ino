@@ -22,9 +22,8 @@ Date: 7 June 2020
 
 // current state
 #define STATE_OFF 0
-#define STATE_UNDEFINED 1
-#define STATE_COLOR 2
-#define STATE_TIME 3
+#define STATE_MANUAL 1
+#define STATE_TIME 2
 
 // button control
 #define SHORT_PRESS_TIMEOUT 750
@@ -102,10 +101,11 @@ char wifiPassword[32] = "";
 
 byte currentState = STATE_OFF;
 
-// currentState == STATE_COLOR
+// currentState == STATE_MANUAL
+Channels lastOutput {0,0};
 Channels currentOutput {0,0};
 
-// currentState == STATE_UNDEFINED || currentState == STATE_TIME
+// currentState == STATE_TIME
 byte brightness = 0;
 float hue = 0.5;
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
@@ -424,15 +424,37 @@ void setupOTAUpdate(){
 // websocket communication
 //*************************
 
-void broadcastCurrentState() {
+void broadcastCurrentState(unsigned int messageID) {
   // webSocket.broadcastTXT("{\"color\":{\"1\":" + String(currentOutput.a) + ",\"2\":" + String(currentOutput.b) + "}}");
-  webSocket.broadcastTXT("{\"action\":\"GET /output\",\"data\":{\"channel\":[" +
+  String state;
+  switch (currentState){
+    case STATE_OFF:
+      state = "OFF";
+      break;
+    case STATE_MANUAL:
+      state = "MANUAL";
+      break;
+    case STATE_TIME:
+      state = "TIME";
+      break;
+  }
+  webSocket.broadcastTXT("{\"action\":\"GET /output\",\"id\":" + String(messageID) +
+    ",\"data\":{\"channel\":[" +
       String(currentOutput.a) + "," + String(currentOutput.b) +
     "],\"brightness\":" + String(brightness) +
     ",\"ratio\":" + String((byte)(hue * 100)) +
     ",\"power\":" + ((currentOutput.a == 0 && currentOutput.b == 0) ? "false" : "true") +
     ",\"time\":\"" + String(timeClient.getHours() % 24) + ":" + String(timeClient.getMinutes() % 60) +
+    "\",\"state\": \"" + String(state) +
     "\"}}");
+}
+
+void sendOK(byte target, unsigned int messageID){
+  webSocket.sendTXT(target, "{\"status\":\"OK\", \"id\":" + String(messageID)+ "}");
+}
+
+bool getStateByColor(Channels output){
+  return output.a == 0 && output.b == 0 ? STATE_OFF : STATE_MANUAL;
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
@@ -451,8 +473,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             doc["color"]["1"],
             doc["color"]["2"]
           };
-          currentState = STATE_COLOR;
-          broadcastCurrentState();
+          currentState = getStateByColor(currentOutput);
+          broadcastCurrentState(0);
           return;
         }
         /* LEGACY END */
@@ -462,14 +484,24 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         }
         String action = String((const char*)doc["action"]);
 
-        if (action == "SET /output/channel") {
+        unsigned int messageID = 0;
+        if(doc.containsKey("id")){
+          messageID = doc["id"];
+        }
+
+
+        if (action == "GET /output") {
+          broadcastCurrentState(messageID);
+
+
+        } else if (action == "SET /output/channel") {
           currentOutput = {
             (byte)doc["data"][0],
             (byte)doc["data"][1]
           };
-          currentState = STATE_COLOR;
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
-          broadcastCurrentState();
+          currentState = getStateByColor(currentOutput);
+          sendOK(num, messageID);
+          broadcastCurrentState(messageID);
         } else if (action == "GET /output/channel") {
           webSocket.sendTXT(num, "{\"action\":\"GET /output/channel\",\"data\":[" +
             String(currentOutput.a) + "," +
@@ -479,49 +511,49 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         } else if (action == "SET /output/power") {
           if (doc["data"] == 0) {
             currentOutput = OFF;
-            currentState = STATE_COLOR;
+            currentState = STATE_OFF;
           } else {
             currentState = STATE_TIME;
           }
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
-          broadcastCurrentState();
+          sendOK(num, messageID);
+          broadcastCurrentState(messageID);
         } else if (action == "GET /output/power") {
           if (currentOutput.a == 0 && currentOutput.b == 0) {
-            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"data\":0}");
+            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"id\":" + String(messageID) + ",\"data\":0}");
           } else {
-            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"data\":1}");
+            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"id\":" + String(messageID) + ",\"data\":1}");
           }
 
 
         } else if (action == "SET /output/ratio") {
           hue = (byte)doc["data"] / 100.0;
           updateLED();
-          currentState = STATE_COLOR;
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
-          broadcastCurrentState();
+          currentState = getStateByColor(currentOutput);
+          sendOK(num, messageID);
+          broadcastCurrentState(messageID);
         } else if (action == "GET /output/ratio") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/ratio\",\"data\":" + String((byte)(hue * 100)) + "}");
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/ratio\",\"id\":" + String(messageID) + ",\"data\":" + String((byte)(hue * 100)) + "}");
 
 
         } else if (action == "SET /output/brightness") {
           brightness = (byte)doc["data"];
           updateLED();
-          currentState = STATE_COLOR;
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
-          broadcastCurrentState();
+          currentState = getStateByColor(currentOutput);
+          sendOK(num, messageID);
+          broadcastCurrentState(messageID);
         } else if (action == "GET /output/brightness") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness\",\"data\":" + String(brightness) + "}");
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness\",\"id\":" + String(messageID) + ",\"data\":" + String(brightness) + "}");
 
 
         } else if (action == "SET /output/brightness-and-ratio") {
           brightness = (byte)doc["data"][0];
           hue = (byte)doc["data"][1] / 100.0;
           updateLED();
-          currentState = STATE_COLOR;
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
-          broadcastCurrentState();
+          currentState = getStateByColor(currentOutput);
+          sendOK(num, messageID);
+          broadcastCurrentState(messageID);
         } else if (action == "GET /output/brightness-and-ratio") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"data\":["
+          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"id\":" + String(messageID) + ",\"data\":["
             + String(brightness) + ","
             + String((byte)(hue * 100))
           + "]}");
@@ -532,7 +564,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           serializeJson(doc["data"], configFile);
           configFile.close();
           setupTimeConfig();
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          sendOK(num, messageID);
         } else if (action == "GET /settings/daylight") {
           String hueList = "";
           String brightnessList = "";
@@ -544,7 +576,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               brightnessList += ",";
             }
           }
-          webSocket.sendTXT(num, "{\"action\":\"GET /settings/daylight\",\"data\":{\"ratio\":["
+          webSocket.sendTXT(num, "{\"action\":\"GET /settings/daylight\",\"id\":" + String(messageID) + ",\"data\":{\"ratio\":["
             + String(hueList)
             + "],\"brightness\":["
             + String(brightnessList)
@@ -559,16 +591,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           File configFile = filesystem->open(PATH_CONFIG_WIFI, "w");
           serializeJson(doc["data"], configFile);
           configFile.close();
-          webSocket.sendTXT(num, "{\"status\":\"OK\"}");
+          sendOK(num, messageID);
           ESP.restart();
         } else if (action == "GET /settings/connection") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /settings/connection\",\"data\":{\"hostname\":"
+          webSocket.sendTXT(num, "{\"action\":\"GET /settings/connection\",\"id\":" + String(messageID) + ",\"data\":{\"hostname\":"
             + String(hostname)
             + "\"}}");
 
 
         } else {
-          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Unknown Payload\"}");
+          webSocket.sendTXT(num, "{\"status\":\"Error\",\"id\":" + String(messageID) + ",\"data\":\"Unknown Payload\"}");
           return;
         }
       }
@@ -674,16 +706,17 @@ void handleButton(){
             if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
               if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED) && !waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
                 // tap tap tap hold
-                currentState = STATE_UNDEFINED;
+                currentState = getStateByColor(currentOutput);
                 // cycle hue +
                 while (hue + HUE_STEP <= HUE_MAX && isBtn(TOUCHED, HUE_STEP_DURATION)) {
                   hue += HUE_STEP;
                   updateLED();
                 }
+                
               }
             } else {
               // tap tap hold
-              currentState = STATE_UNDEFINED;
+              currentState = getStateByColor(currentOutput);
               // cycle hue -
               while (hue - HUE_STEP >= HUE_MIN && isBtn(TOUCHED, HUE_STEP_DURATION)) {
                 hue -= HUE_STEP;
@@ -695,7 +728,7 @@ void handleButton(){
           }
         } else {
           // tap, hold
-          currentState = STATE_UNDEFINED;
+          currentState = STATE_MANUAL;
           // increase brightness
           while (brightness + BRIGHNESS_STEP <= BRIGHTNESS_MAX && isBtn(TOUCHED, BRIGHNESS_STEP_DURATION)) {
             brightness += BRIGHNESS_STEP;
@@ -716,12 +749,14 @@ void handleButton(){
       }
     } else {
       // hold
-      currentState = STATE_UNDEFINED;
+      currentState = STATE_MANUAL;
       // reduce brightness
       while (brightness - BRIGHNESS_STEP >= BRIGHTNESS_MIN && isBtn(TOUCHED, BRIGHNESS_STEP_DURATION)) {
         brightness -= BRIGHNESS_STEP;
         updateLED();
+        currentState = getStateByColor(currentOutput);
       }
+      currentState = getStateByColor(currentOutput);
     }
     waitForBtn(TIMEOUT_INFINITY, RELEASED);
   }
@@ -748,7 +783,7 @@ void setByTime() {
       (unsigned int)((time_hue[(hour + 1) % 24] / 100.0)* STEP_PRECISION)
     ) / STEP_PRECISION;
   if(millis() - lastTimeSend > 1000){
-    broadcastCurrentState();
+    broadcastCurrentState(0);
     lastTimeSend = millis();
   }
   updateLED();
@@ -800,11 +835,14 @@ void loop() {
     handleButton(); // listen for hardware inputs
   #endif
   switch (currentState) {
-    case STATE_COLOR: {
-        setOutput(currentOutput);
-        currentState = STATE_UNDEFINED;
-        brightness = getBrightness(currentOutput);
-        hue = getHue(currentOutput);
+    case STATE_OFF:
+    case STATE_MANUAL: {
+        if(lastOutput.a != currentOutput.a || lastOutput.b != currentOutput.b){
+          setOutput(currentOutput);
+          lastOutput = currentOutput;
+          brightness = getBrightness(currentOutput);
+          hue = getHue(currentOutput);
+        }
       }
       break;
     case STATE_TIME: {

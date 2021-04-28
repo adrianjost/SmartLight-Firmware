@@ -43,6 +43,34 @@ If you send `{ "action": "GET /output/channel" }`, the server will answer with a
 
 Each string value is only allowed to include max. 50 characters. If you use more, it's possible that the payload can not be parsed. The same issue can arise if you send additional properties.
 
+To identify the related answer to your request, you can send add a field `id` with an integer. This `id` is included in all answers related to your request. You can use this, to filter prevent feedback loops when watching for broadcasted state messages.
+
+#### Get Current State
+
+This action is a special case, because it does not have a set counterpart. To set a state, you need to use one of the more specific actions.
+
+**Request:**
+```js
+{
+  "action": "GET /output",
+  "id": 12345
+}
+```
+**Response:**
+```js
+{
+  "action": "GET /output",
+  "id": 12345,
+  "data": {
+    "channel": [0, 0],
+    "brightness": 0,
+    "ratio": 50,
+    "time": "6:34",
+    "state": "OFF"
+  }
+}
+```
+
 #### Set Channels directly
 
 Sets all channels to the defined values. The max value is `255`.
@@ -50,6 +78,7 @@ Sets all channels to the defined values. The max value is `255`.
 ```js
 {
   "action": "SET /output/channel",
+  "id": 12345,
   "data": [/* value channel 1 */, /* value channel 2 */]
 }
 ```
