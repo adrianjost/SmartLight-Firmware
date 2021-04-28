@@ -4,7 +4,11 @@ on: [push]
 jobs:
   firmware:
     name: Firmware
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v2
