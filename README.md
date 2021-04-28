@@ -1,6 +1,6 @@
 # SmartLight Firmware
 
-[![Build Status](https://travis-ci.com/adrianjost/SmartLight-Firmware.svg?branch=master)](https://travis-ci.com/adrianjost/SmartLight-Firmware)
+[![Build](https://github.com/adrianjost/SmartLight-Firmware/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/adrianjost/SmartLight-Firmware/actions/workflows/build.yml)
 
 ## How to use
 
