@@ -30,8 +30,8 @@ Date: 7 June 2020
 #define TIMEOUT_INFINITY 60000 // 1min
 #define BRIGHTNESS_MIN 0
 #define BRIGHTNESS_MAX 255
-#define BRIGHNESS_STEP 1
-#define BRIGHNESS_STEP_DURATION 15
+#define BRIGHTNESS_STEP 1
+#define BRIGHTNESS_STEP_DURATION 15
 #define HUE_MIN 0
 #define HUE_MAX 1
 #define HUE_STEP 0.01
@@ -730,8 +730,8 @@ void handleButton(){
           // tap, hold
           currentState = STATE_MANUAL;
           // increase brightness
-          while (brightness + BRIGHNESS_STEP <= BRIGHTNESS_MAX && isBtn(TOUCHED, BRIGHNESS_STEP_DURATION)) {
-            brightness += BRIGHNESS_STEP;
+          while (brightness + BRIGHTNESS_STEP <= BRIGHTNESS_MAX && isBtn(TOUCHED, BRIGHTNESS_STEP_DURATION)) {
+            brightness += BRIGHTNESS_STEP;
             updateLED();
           }
         }
@@ -751,8 +751,8 @@ void handleButton(){
       // hold
       currentState = STATE_MANUAL;
       // reduce brightness
-      while (brightness - BRIGHNESS_STEP >= BRIGHTNESS_MIN && isBtn(TOUCHED, BRIGHNESS_STEP_DURATION)) {
-        brightness -= BRIGHNESS_STEP;
+      while (brightness - BRIGHTNESS_STEP >= BRIGHTNESS_MIN && isBtn(TOUCHED, BRIGHTNESS_STEP_DURATION)) {
+        brightness -= BRIGHTNESS_STEP;
         updateLED();
         currentState = getStateByColor(currentOutput);
       }
