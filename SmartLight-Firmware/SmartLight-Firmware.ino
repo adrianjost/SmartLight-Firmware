@@ -435,7 +435,7 @@ void broadcastCurrentState(unsigned int messageID) {
       state = "MANUAL";
       break;
     case STATE_TIME:
-      state = "TIME";
+      state = "AUTO";
       break;
   }
   webSocket.broadcastTXT("{\"action\":\"GET /output\",\"id\":" + String(messageID) +

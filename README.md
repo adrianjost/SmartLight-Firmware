@@ -67,7 +67,7 @@ This action is a special case, because it does not have a set counterpart. To se
     "ratio": 50,
     "power": false,
     "time": "6:34",
-    "state": "OFF"
+    "state": "OFF" // "MANUAL", "AUTO"
   }
 }
 ```
