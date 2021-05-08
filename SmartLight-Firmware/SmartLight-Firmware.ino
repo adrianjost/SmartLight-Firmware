@@ -837,12 +837,10 @@ void loop() {
   switch (currentState) {
     case STATE_OFF:
     case STATE_MANUAL: {
-        if(lastOutput.a != currentOutput.a || lastOutput.b != currentOutput.b){
-          setOutput(currentOutput);
-          lastOutput = currentOutput;
-          brightness = getBrightness(currentOutput);
-          hue = getHue(currentOutput);
-        }
+        setOutput(currentOutput);
+        lastOutput = currentOutput;
+        brightness = getBrightness(currentOutput);
+        hue = getHue(currentOutput);
       }
       break;
     case STATE_TIME: {
