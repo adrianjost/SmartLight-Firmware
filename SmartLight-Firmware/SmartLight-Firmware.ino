@@ -111,7 +111,7 @@ float hue = 0.5;
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
 byte time_brightness[24] = {1,1,3,5,13,51,128,204,230,255,255,255,255,255,255,255,255,255,180,100,40,25,15,3};
 byte time_hue[24] = {0,0,0,2,5,10,20,40,50,60,70,70,70,70,70,70,70,50,30,20,0,0,0,0};
-int time_utc_offset = 0;
+byte time_utc_offset = 0;
 char* time_server = (char *)"pool.ntp.org";
 
 /**********************************
@@ -296,8 +296,7 @@ void setupTimeConfig() {
     timeClient.setPoolServerName(time_server);
   }
   if(doc.containsKey("utcOffset")){
-    time_utc_offset = (int)doc["utcOffset"];
-    timeClient.setTimeOffset(time_utc_offset * 60);
+    time_utc_offset = (byte)doc["utcOffset"];
   }
 }
 
@@ -444,7 +443,7 @@ void broadcastCurrentState(unsigned int messageID) {
     "],\"brightness\":" + String(brightness) +
     ",\"ratio\":" + String((byte)(hue * 100)) +
     ",\"power\":" + ((currentOutput.a == 0 && currentOutput.b == 0) ? "false" : "true") +
-    ",\"time\":\"" + String(timeClient.getHours() % 24) + ":" + String(timeClient.getMinutes() % 60) +
+    ",\"time\":\"" + String((timeClient.getHours() + time_utc_offset) % 24) + ":" + String(timeClient.getMinutes() % 60) +
     "\",\"state\": \"" + String(state) +
     "\"}}");
 }
@@ -775,7 +774,7 @@ void setByTime() {
     lastTimeUpdate = millis();
   }
   byte minutes = timeClient.getMinutes() % 60;
-  byte hour = timeClient.getHours() % 24;
+  byte hour = (timeClient.getHours() + time_utc_offset) % 24;
   brightness = map(minutes, 0, 60, time_brightness[(hour) % 24], time_brightness[(hour + 1) % 24]);
   hue = map(
       minutes, 0, 60,
