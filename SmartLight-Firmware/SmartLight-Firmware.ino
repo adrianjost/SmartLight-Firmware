@@ -4,11 +4,32 @@ Version: 4.0.0
 Date: 7 June 2020
 **/
 
+// FEATURE LIST
+// #define FEATURE_BUTTON
+#define FEATURE_ROTARY
+
 // PIN DEFINITIONS
-#define PIN_RESET 0 // comment out on boards without FLASH-button
-#define PIN_INPUT 2
-#define PIN_CH1 1
+// #define PIN_RESET 0 // comment out on boards without FLASH-button
+#ifdef FEATURE_BUTTON
+  #define PIN_INPUT 2
+  #define TOUCHED true
+  #define RELEASED false
+#endif
+
+#define PIN_CH1 2
 #define PIN_CH2 3
+
+#ifdef FEATURE_ROTARY
+  #define PIN_SDA 0
+  #define PIN_SCK 1
+#endif
+
+// // rotary setup
+#ifdef FEATURE_ROTARY
+  #define SS_SWITCH     24
+  #define SS_NEOPIX     6
+  #define SEESAW_ADDR   0x36
+#endif
 
 // config storage
 #define PATH_CONFIG_WIFI "/config.json"
@@ -26,16 +47,27 @@ Date: 7 June 2020
 #define STATE_TIME 2
 
 // button control
+#define HUE_STEP_DURATION 70
+#define BRIGHTNESS_STEP_DURATION 15
 #define SHORT_PRESS_TIMEOUT 750
 #define TIMEOUT_INFINITY 60000 // 1min
+#ifdef FEATURE_BUTTON
+  #define BRIGHTNESS_STEP 1
+  #define HUE_STEP 0.01
+#endif
+
+// rotary control
+#ifdef FEATURE_ROTARY
+  #define BRIGHTNESS_STEP 5
+  #define HUE_STEP 0.05
+#endif
+
+// control steps
 #define BRIGHTNESS_MIN 0
 #define BRIGHTNESS_MAX 255
-#define BRIGHTNESS_STEP 1
-#define BRIGHTNESS_STEP_DURATION 15
-#define HUE_MIN 0
-#define HUE_MAX 1
-#define HUE_STEP 0.01
-#define HUE_STEP_DURATION 70
+
+#define HUE_MIN 0.0
+#define HUE_MAX 1.0
 
 // Durations in ms
 #define DURATION_MINUTE 60000
@@ -58,6 +90,14 @@ Date: 7 June 2020
 #include <NTPClient.h> // 3.2.0 Fabrice Weinberg
 #include <WiFiUdp.h>
 
+#ifdef FEATURE_ROTARY
+  // Adafruit Rotary Encoder
+  #include <Wire.h>
+  #include "Adafruit_seesaw.h"
+  #include <seesaw_neopixel.h>
+#endif
+
+
 // comment in for serial debugging
 // #define DEBUG
 #ifdef DEBUG
@@ -73,13 +113,18 @@ WebSocketsServer webSocket = WebSocketsServer(80);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
+#ifdef FEATURE_ROTARY
+  Adafruit_seesaw ss;
+  seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
+  int32_t encoder_position;
+#endif
+
 // JSON sizes https://arduinojson.org/v6/assistant/
 // { "hostname": "abcdef" }
 const size_t maxWifiConfigSize = JSON_OBJECT_SIZE(2) + 80;
 const size_t maxTimeConfigSize = 2*JSON_ARRAY_SIZE(24) + JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(4) + 140;
 // WebSocket Payload (max value is time light configuration)
 const size_t maxPayloadSize = maxTimeConfigSize;
-
 
 struct Channels {
   byte a;
@@ -612,12 +657,37 @@ void setupWebsocket(){
   webSocket.onEvent(webSocketEvent);
 }
 
-//*************************
-// button control
-//*************************
+#ifdef FEATURE_ROTARY
+  bool encoderSetup = 0;
+  void setupRotary(){
+    if (! ss.begin(SEESAW_ADDR) || ! sspixel.begin(SEESAW_ADDR)) {
+      // Couldn't find seesaw on default address
+      blink(ON, 3, 300);
+      return;
+    } else {
+      encoderSetup = 1;
+    }
 
-#define TOUCHED true
-#define RELEASED false
+    uint32_t version = ((ss.getVersion() >> 16) & 0xFFFF);
+    if (version != 4991){
+      // unsupported firmware on seesaw
+      blink(ON, 4, 300);
+      return;
+    }
+
+    // get starting position
+    encoder_position = ss.getEncoderPosition();
+
+    ss.pinMode(SS_SWITCH, INPUT_PULLUP);
+
+    sspixel.setBrightness(0);
+    sspixel.show();
+  }
+#endif
+
+//*************************
+// analog control
+//*************************
 
 Channels floatChtoCh(FloatChannels color){
   return Channels {
@@ -641,35 +711,6 @@ void updateLED() {
     constrain(brightness * cw, BRIGHTNESS_MIN, BRIGHTNESS_MAX)
   });
   setOutput(currentOutput);
-}
-
-bool isBtn(bool state = TOUCHED, unsigned long debounceDuration = 75) {
-  // debounce
-  unsigned long touchStart = millis();
-  unsigned long match = 0;
-  unsigned long noMatch = 0;
-  do {
-    if (digitalRead(PIN_INPUT) != state) {
-      match += 1;
-    }else{
-      noMatch += 1;
-    }
-    delay(min(debounceDuration, (unsigned long)5));
-  } while(millis() - touchStart < debounceDuration);
-  return (match >= noMatch * 2);
-}
-
-bool waitForBtn(int ms, bool state = TOUCHED) {
-  if(ms == 0){
-    return isBtn(state, 0);
-  }
-  unsigned long start = millis();
-  do {
-    if (isBtn(state)) {
-      return true;
-    }
-  } while (millis() - start < ms);
-  return false;
 }
 
 float getHue(Channels ch) {
@@ -696,70 +737,175 @@ float getBrightness(Channels ch) {
   return max(ch.a, ch.b);
 }
 
-void handleButton(){
-  if (waitForBtn(0, TOUCHED)) {
-    if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
-      if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED)) {
-        if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
-          if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED)) {
-            if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
-              if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED) && !waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
-                // tap tap tap hold
+#ifdef FEATURE_BUTTON
+  bool isBtn(bool state = TOUCHED, unsigned long debounceDuration = 75) {
+    // debounce
+    unsigned long touchStart = millis();
+    unsigned long match = 0;
+    unsigned long noMatch = 0;
+    do {
+      #ifdef PIN_INPUT
+        if (digitalRead(PIN_INPUT) != state) {
+          match += 1;
+        }else{
+          noMatch += 1;
+        }
+      #else
+        noMatch += 1;
+      #endif
+      delay(min(debounceDuration, (unsigned long)5));
+    } while(millis() - touchStart < debounceDuration);
+    return (match >= noMatch * 2);
+  
+  }
+
+  bool waitForBtn(int ms, bool state = TOUCHED) {
+    if(ms == 0){
+      return isBtn(state, 0);
+    }
+    unsigned long start = millis();
+    do {
+      if (isBtn(state)) {
+        return true;
+      }
+    } while (millis() - start < ms);
+    return false;
+  }
+
+  void handleButton(){
+    if (waitForBtn(0, TOUCHED)) {
+      if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+        if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED)) {
+          if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+            if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED)) {
+              if (waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+                if (waitForBtn(SHORT_PRESS_TIMEOUT, TOUCHED) && !waitForBtn(SHORT_PRESS_TIMEOUT, RELEASED)) {
+                  // tap tap tap hold
+                  currentState = getStateByColor(currentOutput);
+                  // cycle hue +
+                  while (hue + HUE_STEP <= HUE_MAX && isBtn(TOUCHED, HUE_STEP_DURATION)) {
+                    hue += HUE_STEP;
+                    updateLED();
+                  }
+                }
+              } else {
+                // tap tap hold
                 currentState = getStateByColor(currentOutput);
-                // cycle hue +
-                while (hue + HUE_STEP <= HUE_MAX && isBtn(TOUCHED, HUE_STEP_DURATION)) {
-                  hue += HUE_STEP;
+                // cycle hue -
+                while (hue - HUE_STEP >= HUE_MIN && isBtn(TOUCHED, HUE_STEP_DURATION)) {
+                  hue -= HUE_STEP;
                   updateLED();
                 }
-                
               }
             } else {
-              // tap tap hold
-              currentState = getStateByColor(currentOutput);
-              // cycle hue -
-              while (hue - HUE_STEP >= HUE_MIN && isBtn(TOUCHED, HUE_STEP_DURATION)) {
-                hue -= HUE_STEP;
-                updateLED();
-              }
+              // tap tap
             }
           } else {
-            // tap tap
+            // tap, hold
+            currentState = STATE_MANUAL;
+            // increase brightness
+            while (brightness + BRIGHTNESS_STEP <= BRIGHTNESS_MAX && isBtn(TOUCHED, BRIGHTNESS_STEP_DURATION)) {
+              brightness += BRIGHTNESS_STEP;
+              updateLED();
+            }
           }
         } else {
-          // tap, hold
-          currentState = STATE_MANUAL;
-          // increase brightness
-          while (brightness + BRIGHTNESS_STEP <= BRIGHTNESS_MAX && isBtn(TOUCHED, BRIGHTNESS_STEP_DURATION)) {
-            brightness += BRIGHTNESS_STEP;
+          // tap
+          if(currentState == STATE_OFF){
+            // on
+            currentState = STATE_TIME;
+          }else{
+            // off
+            brightness = BRIGHTNESS_MIN;
             updateLED();
+            currentState = STATE_OFF;
           }
         }
       } else {
-        // tap
-        if(currentState == STATE_OFF){
-          // on
-          currentState = STATE_TIME;
-        }else{
-          // off
-          brightness = BRIGHTNESS_MIN;
+        // hold
+        currentState = STATE_MANUAL;
+        // reduce brightness
+        while (brightness - BRIGHTNESS_STEP >= BRIGHTNESS_MIN && isBtn(TOUCHED, BRIGHTNESS_STEP_DURATION)) {
+          brightness -= BRIGHTNESS_STEP;
           updateLED();
-          currentState = STATE_OFF;
+          currentState = getStateByColor(currentOutput);
         }
-      }
-    } else {
-      // hold
-      currentState = STATE_MANUAL;
-      // reduce brightness
-      while (brightness - BRIGHTNESS_STEP >= BRIGHTNESS_MIN && isBtn(TOUCHED, BRIGHTNESS_STEP_DURATION)) {
-        brightness -= BRIGHTNESS_STEP;
-        updateLED();
         currentState = getStateByColor(currentOutput);
       }
-      currentState = getStateByColor(currentOutput);
+      waitForBtn(TIMEOUT_INFINITY, RELEASED);
     }
-    waitForBtn(TIMEOUT_INFINITY, RELEASED);
   }
-}
+#endif
+
+#ifdef FEATURE_ROTARY
+  bool pressed = false;
+  bool rotationSincePress = false;
+  void handleRotary(){
+    if(encoderSetup == 0){
+      // skip to prevent crashing other parts
+      return;
+    }
+    int new_position = ss.getEncoderPosition();
+    bool nowPressed = !ss.digitalRead(SS_SWITCH);
+
+    int rotation_diff = (encoder_position - new_position);
+    bool isReleasing = pressed && !nowPressed;
+    if(nowPressed && rotation_diff != 0){
+      rotationSincePress = true;
+    }
+
+    if(isReleasing && !rotationSincePress){
+      if(currentState == STATE_OFF){
+        currentState = STATE_TIME;
+      }else{
+        brightness = BRIGHTNESS_MIN;
+        updateLED();
+        currentState = STATE_OFF;
+      }
+      pressed = false;
+      rotationSincePress = false;
+      return;
+    }
+
+
+    if(isReleasing){
+      pressed = false;
+      rotationSincePress = false;
+    }
+
+    if(nowPressed){
+      pressed = true;
+    }
+
+    if (encoder_position != new_position) {
+      currentState = STATE_MANUAL;
+      if(nowPressed){
+        hue = max(
+          min(
+            (float)hue - ((float)rotation_diff * HUE_STEP),
+            HUE_MAX
+          ),
+          HUE_MIN
+        );
+      }else{
+        brightness = max(
+          min(
+            brightness + (rotation_diff * BRIGHTNESS_STEP),
+            BRIGHTNESS_MAX
+          ),
+          BRIGHTNESS_MIN
+        );
+      }
+      updateLED();
+      #ifdef DEBUG
+        sspixel.setBrightness(brightness);
+        sspixel.setPixelColor(0, sspixel.Color(currentOutput.a, 0, currentOutput.b));
+        sspixel.show();
+      #endif
+      encoder_position = new_position;
+    }
+  }
+#endif
 
 //*************************
 // time control
@@ -800,8 +946,16 @@ void setup() {
     Serial.println("STARTED IN DEBUG MODE");
   #endif
 
+  #ifdef FEATURE_ROTARY
+    Wire.begin(PIN_SDA, PIN_SCK);
+  #endif
+
   #ifdef PIN_INPUT
     pinMode(PIN_INPUT, INPUT);
+  #endif
+
+  #ifdef FEATURE_ROTARY
+    setupRotary();
   #endif
 
   setupFilesystem();
@@ -821,6 +975,7 @@ void setup() {
 
   timeClient.begin();
   timeClient.update();
+
 }
 
 //*************************
@@ -833,13 +988,19 @@ void loop() {
   #ifdef PIN_INPUT
     handleButton(); // listen for hardware inputs
   #endif
+  #ifdef FEATURE_ROTARY
+    handleRotary();
+  #endif
+
   switch (currentState) {
     case STATE_OFF:
     case STATE_MANUAL: {
         setOutput(currentOutput);
         lastOutput = currentOutput;
         brightness = getBrightness(currentOutput);
-        hue = getHue(currentOutput);
+        if(brightness > 0){
+          hue = getHue(currentOutput);
+        }
       }
       break;
     case STATE_TIME: {
