@@ -116,7 +116,7 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 #ifdef FEATURE_ROTARY
   Adafruit_seesaw ss;
   seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
-  int32_t encoder_position;
+  int32_t prev_position;
 #endif
 
 // JSON sizes https://arduinojson.org/v6/assistant/
@@ -689,7 +689,7 @@ void setupWebsocket(){
     }
 
     // get starting position
-    encoder_position = ss.getEncoderPosition();
+    prev_position = ss.getEncoderPosition();
 
     ss.pinMode(SS_SWITCH, INPUT_PULLUP);
 
@@ -851,23 +851,23 @@ float getBrightness(Channels ch) {
 #endif
 
 #ifdef FEATURE_ROTARY
-  bool pressed = false;
-  bool rotationSincePress = false;
+  bool prev_pressed = false;
+  bool rotationSincePushStart = false;
   void handleRotary(){
     if(encoderSetup == 0){
       // skip to prevent crashing other parts
       return;
     }
-    int new_position = ss.getEncoderPosition();
-    bool nowPressed = !ss.digitalRead(SS_SWITCH);
+    int current_position = ss.getEncoderPosition();
+    bool currently_pressed = !ss.digitalRead(SS_SWITCH);
 
-    int rotation_diff = (encoder_position - new_position);
-    bool isReleasing = pressed && !nowPressed;
-    if(nowPressed && rotation_diff != 0){
-      rotationSincePress = true;
-    }
+    int rotation_diff = prev_position - current_position;
 
-    if(isReleasing && !rotationSincePress){
+    rotationSincePushStart = rotationSincePushStart || (currently_pressed && rotation_diff != 0);
+
+    bool isReleasing = prev_pressed && !currently_pressed;
+    if(isReleasing && !rotationSincePushStart){
+      // toggle power state
       if(currentState == STATE_OFF){
         currentState = STATE_TIME;
       }else{
@@ -875,48 +875,40 @@ float getBrightness(Channels ch) {
         updateLED();
         currentState = STATE_OFF;
       }
-      pressed = false;
-      rotationSincePress = false;
+      prev_pressed = currently_pressed; // false
+      rotationSincePushStart = false;
       return;
     }
 
-
-    if(isReleasing){
-      pressed = false;
-      rotationSincePress = false;
+    prev_pressed = currently_pressed;
+    if (prev_position == current_position) {
+      return;
     }
-
-    if(nowPressed){
-      pressed = true;
+    if(currently_pressed){
+      hue = max(
+        min(
+          (float)hue - ((float)rotation_diff * HUE_STEP),
+          HUE_MAX
+        ),
+        HUE_MIN
+      );
+    }else{
+      brightness = max(
+        min(
+          brightness + (rotation_diff * BRIGHTNESS_STEP),
+          BRIGHTNESS_MAX
+        ),
+        BRIGHTNESS_MIN
+      );
     }
-
-    if (encoder_position != new_position) {
-      currentState = STATE_MANUAL;
-      if(nowPressed){
-        hue = max(
-          min(
-            (float)hue - ((float)rotation_diff * HUE_STEP),
-            HUE_MAX
-          ),
-          HUE_MIN
-        );
-      }else{
-        brightness = max(
-          min(
-            brightness + (rotation_diff * BRIGHTNESS_STEP),
-            BRIGHTNESS_MAX
-          ),
-          BRIGHTNESS_MIN
-        );
-      }
-      updateLED();
-      #ifdef DEBUG
-        sspixel.setBrightness(brightness);
-        sspixel.setPixelColor(0, sspixel.Color(currentOutput.a, 0, currentOutput.b));
-        sspixel.show();
-      #endif
-      encoder_position = new_position;
-    }
+    currentState = brightness == BRIGHTNESS_MIN ? STATE_OFF : STATE_MANUAL;
+    updateLED();
+    #ifdef DEBUG
+      sspixel.setBrightness(brightness);
+      sspixel.setPixelColor(0, sspixel.Color(currentOutput.a, 0, currentOutput.b));
+      sspixel.show();
+    #endif
+    prev_position = current_position;
   }
 #endif
 
