@@ -24,7 +24,7 @@ I recommend the Arduino VSCode Extension to trigger builds and uploads directly 
 
 To get the board configuration, enable the extended output during compilation in the arduino IDE, then copy the output of the first line and select the part starting with `-fqbn=esp8266:esp8266:generic:`
 
-```js
+```json
 {
     "sketch": "SmartLight-Firmware\\SmartLight-Firmware.ino",
     "board": "esp8266:esp8266:generic",

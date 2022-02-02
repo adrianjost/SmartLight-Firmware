@@ -482,7 +482,7 @@ void broadcastCurrentState(unsigned int messageID) {
       state = "AUTO";
       break;
   }
-  webSocket.broadcastTXT("{\"action\":\"GET /output\",\"id\":" + String(messageID) +
+  String message = "{\"action\":\"GET /output\",\"id\":" + String(messageID) +
     ",\"data\":{\"channel\":[" +
       String(currentOutput.a) + "," + String(currentOutput.b) +
     "],\"brightness\":" + String(brightness) +
@@ -490,11 +490,13 @@ void broadcastCurrentState(unsigned int messageID) {
     ",\"power\":" + ((currentOutput.a == 0 && currentOutput.b == 0) ? "false" : "true") +
     ",\"time\":\"" + String((timeClient.getHours() + time_utc_offset) % 24) + ":" + String(timeClient.getMinutes() % 60) +
     "\",\"state\": \"" + String(state) +
-    "\"}}");
+    "\"}}";
+  webSocket.broadcastTXT(message);
 }
 
 void sendOK(byte target, unsigned int messageID){
-  webSocket.sendTXT(target, "{\"status\":\"OK\", \"id\":" + String(messageID)+ "}");
+  String message = "{\"status\":\"OK\", \"id\":" + String(messageID)+ "}";
+  webSocket.sendTXT(target, message);
 }
 
 bool getStateByColor(Channels output){
@@ -508,7 +510,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         DynamicJsonDocument doc(maxPayloadSize);
         auto error = deserializeJson(doc, json);
         if (error) {
-          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Failed to parse payload\"}");
+          String message = "{\"status\":\"Error\",\"data\":\"Failed to parse payload\"}";
+          webSocket.sendTXT(num, message);
           return;
         }
         /* LEGACY - Should be removed when Website is updated */
@@ -523,7 +526,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         }
         /* LEGACY END */
         if(!doc.containsKey("action")){
-          webSocket.sendTXT(num, "{\"status\":\"Error\",\"data\":\"Payload has no action\"}");
+          String message = "{\"status\":\"Error\",\"data\":\"Payload has no action\"}";
+          webSocket.sendTXT(num, message);
           return;
         }
         String action = String((const char*)doc["action"]);
@@ -547,9 +551,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           sendOK(num, messageID);
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/channel") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/channel\",\"data\":[" +
+          String message = "{\"action\":\"GET /output/channel\",\"data\":[" +
             String(currentOutput.a) + "," +
-            String(currentOutput.b) + "]}");
+            String(currentOutput.b) + "]}";
+          webSocket.sendTXT(num, message);
 
 
         } else if (action == "SET /output/power") {
@@ -563,9 +568,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/power") {
           if (currentOutput.a == 0 && currentOutput.b == 0) {
-            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"id\":" + String(messageID) + ",\"data\":0}");
+            String message = "{\"action\":\"GET /output/power\",\"id\":" + String(messageID) + ",\"data\":0}";
+            webSocket.sendTXT(num, message);
           } else {
-            webSocket.sendTXT(num, "{\"action\":\"GET /output/power\",\"id\":" + String(messageID) + ",\"data\":1}");
+            String message = "{\"action\":\"GET /output/power\",\"id\":" + String(messageID) + ",\"data\":1}";
+            webSocket.sendTXT(num, message);
           }
 
 
@@ -576,7 +583,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           sendOK(num, messageID);
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/ratio") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/ratio\",\"id\":" + String(messageID) + ",\"data\":" + String((byte)(hue * 100)) + "}");
+          String message = "{\"action\":\"GET /output/ratio\",\"id\":" + String(messageID) + ",\"data\":" + String((byte)(hue * 100)) + "}";
+          webSocket.sendTXT(num, message);
 
 
         } else if (action == "SET /output/brightness") {
@@ -586,7 +594,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           sendOK(num, messageID);
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/brightness") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness\",\"id\":" + String(messageID) + ",\"data\":" + String(brightness) + "}");
+          String message = "{\"action\":\"GET /output/brightness\",\"id\":" + String(messageID) + ",\"data\":" + String(brightness) + "}";
+          webSocket.sendTXT(num, message);
 
 
         } else if (action == "SET /output/brightness-and-ratio") {
@@ -597,10 +606,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           sendOK(num, messageID);
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/brightness-and-ratio") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /output/brightness-and-ratio\",\"id\":" + String(messageID) + ",\"data\":["
+          String message = "{\"action\":\"GET /output/brightness-and-ratio\",\"id\":" + String(messageID) + ",\"data\":["
             + String(brightness) + ","
             + String((byte)(hue * 100))
-          + "]}");
+          + "]}";
+          webSocket.sendTXT(num, message);
 
 
         } else if (action == "SET /settings/daylight") {
@@ -620,7 +630,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               brightnessList += ",";
             }
           }
-          webSocket.sendTXT(num, "{\"action\":\"GET /settings/daylight\",\"id\":" + String(messageID) + ",\"data\":{\"ratio\":["
+          String message = "{\"action\":\"GET /settings/daylight\",\"id\":" + String(messageID) + ",\"data\":{\"ratio\":["
             + String(hueList)
             + "],\"brightness\":["
             + String(brightnessList)
@@ -628,7 +638,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             + String(time_utc_offset)
             + ",\"ntpServer\":\""
             + String(time_server)
-            + "\"}}");
+            + "\"}}";
+          webSocket.sendTXT(num, message);
 
 
         } else if (action == "SET /settings/connection") {
@@ -638,13 +649,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           sendOK(num, messageID);
           ESP.restart();
         } else if (action == "GET /settings/connection") {
-          webSocket.sendTXT(num, "{\"action\":\"GET /settings/connection\",\"id\":" + String(messageID) + ",\"data\":{\"hostname\":"
+          String message = "{\"action\":\"GET /settings/connection\",\"id\":" + String(messageID) + ",\"data\":{\"hostname\":"
             + String(hostname)
-            + "\"}}");
+            + "\"}}";
+          webSocket.sendTXT(num, message);
 
 
         } else {
-          webSocket.sendTXT(num, "{\"status\":\"Error\",\"id\":" + String(messageID) + ",\"data\":\"Unknown Payload\"}");
+          String message = "{\"status\":\"Error\",\"id\":" + String(messageID) + ",\"data\":\"Unknown Payload\"}";
+          webSocket.sendTXT(num, message);
           return;
         }
       }
