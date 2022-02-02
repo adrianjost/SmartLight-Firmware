@@ -5,7 +5,7 @@
 ## How to use
 
 Please read the full installation guide:
-https://docs.smartlight.ga/setup/build-the-hardware/install-firmware
+https://docs.smart-light.ga/setup/build-the-hardware/install-firmware
 
 ## Recommended VSCode Settings
 
