@@ -1,6 +1,5 @@
 name: Build
 on: [push]
- 
 jobs:
   firmware:
     name: Firmware
@@ -23,6 +22,6 @@ jobs:
           arduino-cli lib install ArduinoJson@6.16.1
           arduino-cli lib install WebSockets@2.1.4
           arduino-cli lib install NTPClient@3.2.0
-          arduino-cli lib install --config-file ./arduino-cli.yml --git-url https://github.com/tzapu/WiFiManager.git
+          arduino-cli lib install --config-file ./arduino-cli.yml --git-url https://github.com/tzapu/WiFiManager.git https://github.com/adafruit/Adafruit_BusIO https://github.com/adafruit/Adafruit_Seesaw
       - name: Compile Sketch
         run: arduino-cli compile --fqbn esp8266:esp8266:generic ./SmartLight-Firmware
