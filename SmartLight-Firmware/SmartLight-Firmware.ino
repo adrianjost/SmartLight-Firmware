@@ -60,6 +60,7 @@ Date: 7 June 2020
 #ifdef FEATURE_ROTARY
   #define BRIGHTNESS_STEP 5
   #define HUE_STEP 0.05
+  #define MAX_STEPS_PER_TICK 10
 #endif
 
 // control steps
@@ -862,6 +863,12 @@ float getBrightness(Channels ch) {
 
     int rotation_diff = prev_position - current_position;
 
+  
+    if(rotation_diff < -MAX_STEPS_PER_TICK || rotation_diff > MAX_STEPS_PER_TICK){
+      // read some unrealistic values - sometimes the rotary encoder goes crazy
+      return;
+    }
+
     rotationSincePushStart = rotationSincePushStart || (currently_pressed && rotation_diff != 0);
 
     bool isReleasing = prev_pressed && !currently_pressed;
@@ -875,34 +882,42 @@ float getBrightness(Channels ch) {
         currentState = STATE_OFF;
       }
       prev_pressed = currently_pressed; // false
+      prev_position = current_position;
       rotationSincePushStart = false;
       return;
     }
-
     prev_pressed = currently_pressed;
+
     if (prev_position == current_position) {
       return;
     }
     if(currently_pressed){
-      hue = max(
-        min(
-          (float)hue - ((float)rotation_diff * HUE_STEP),
-          HUE_MAX
-        ),
-        HUE_MIN
+      hue = constrain(
+        (float)hue - ((float)rotation_diff * HUE_STEP),
+        HUE_MIN,
+        HUE_MAX
       );
     }else{
-      brightness = max(
-        min(
-          brightness + (rotation_diff * BRIGHTNESS_STEP),
-          BRIGHTNESS_MAX
-        ),
-        BRIGHTNESS_MIN
+      brightness = constrain(
+        brightness + (rotation_diff * BRIGHTNESS_STEP),
+        BRIGHTNESS_MIN,
+        BRIGHTNESS_MAX
       );
     }
     currentState = brightness == BRIGHTNESS_MIN ? STATE_OFF : STATE_MANUAL;
     updateLED();
+
+
     #ifdef DEBUG
+      String message = 
+        "prev:" +  String(prev_position) +
+        ", current:" + String(current_position) +
+        ", diff:" + String(rotation_diff) +
+        ", pressed:" + String(currently_pressed) +
+        ", hue:" + String((byte)(hue * 100)) +
+        ", brightness:" + String(brightness);
+      webSocket.broadcastTXT(message);
+
       sspixel.setBrightness(brightness);
       sspixel.setPixelColor(0, sspixel.Color(currentOutput.a, 0, currentOutput.b));
       sspixel.show();
