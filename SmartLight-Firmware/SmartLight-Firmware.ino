@@ -147,7 +147,6 @@ char wifiPassword[32] = "";
 byte currentState = STATE_OFF;
 
 // currentState == STATE_MANUAL
-Channels lastOutput {0,0};
 Channels currentOutput {0,0};
 
 // currentState == STATE_TIME
@@ -980,7 +979,6 @@ void setup() {
 
   timeClient.begin();
   timeClient.update();
-
 }
 
 //*************************
@@ -1001,7 +999,6 @@ void loop() {
     case STATE_OFF:
     case STATE_MANUAL: {
         setOutput(currentOutput);
-        lastOutput = currentOutput;
         brightness = getBrightness(currentOutput);
         if(brightness > 0){
           hue = getHue(currentOutput);
