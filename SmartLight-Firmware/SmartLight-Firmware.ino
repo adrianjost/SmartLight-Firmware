@@ -60,7 +60,7 @@ Date: 7 June 2020
 #ifdef FEATURE_ROTARY
   #define BRIGHTNESS_STEP 5
   #define HUE_STEP 0.05
-  #define MAX_STEPS_PER_TICK 10
+  #define MAX_STEPS_PER_TICK 1
 #endif
 
 // control steps
