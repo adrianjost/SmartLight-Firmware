@@ -191,10 +191,10 @@ void setOutput(Channels ch){
   #endif
 
   #ifdef PIN_CH1
-    analogWrite(PIN_CH1, map(ch.a,0,255,0,1024));
+    analogWrite(PIN_CH1, ch.a);
   #endif
   #ifdef PIN_CH2
-    analogWrite(PIN_CH2, map(ch.b,0,255,0,1024));
+    analogWrite(PIN_CH2, ch.b);
   #endif
 }
 
