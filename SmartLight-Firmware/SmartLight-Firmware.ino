@@ -30,6 +30,7 @@ Date: 7 June 2020
   #define SS_NEOPIX     6
   #define SEESAW_ADDR   0x36
 #endif
+#define HUE_RESET_TIMEOUT 30000
 
 // config storage
 #define PATH_CONFIG_WIFI "/config.json"
@@ -145,6 +146,7 @@ char hostname[32] = "A CHIP";
 char wifiPassword[32] = "";
 
 
+byte prevState = STATE_OFF;
 byte currentState = STATE_OFF;
 
 // currentState == STATE_MANUAL
@@ -933,20 +935,35 @@ float getBrightness(Channels ch) {
 #define STEP_PRECISION 10000.0
 
 unsigned long lastTimeUpdate = 0;
-unsigned long lastTimeSend = 0;
-void setByTime() {
+void maybeUpdateTime() {
   if(millis() - lastTimeUpdate > DURATION_MINUTE * 5){
     timeClient.update();
     lastTimeUpdate = millis();
   }
+}
+
+void setBrightnessByTime() {
+  maybeUpdateTime();
   byte minutes = timeClient.getMinutes() % 60;
   byte hour = (timeClient.getHours() + time_utc_offset) % 24;
   brightness = map(minutes, 0, 60, time_brightness[(hour) % 24], time_brightness[(hour + 1) % 24]);
+}
+
+void setHueByTime() {
+  maybeUpdateTime();
+  byte minutes = timeClient.getMinutes() % 60;
+  byte hour = (timeClient.getHours() + time_utc_offset) % 24;
   hue = map(
       minutes, 0, 60,
       (unsigned int)((time_hue[(hour) % 24] / 100.0) * STEP_PRECISION),
-      (unsigned int)((time_hue[(hour + 1) % 24] / 100.0)* STEP_PRECISION)
+      (unsigned int)((time_hue[(hour + 1) % 24] / 100.0) * STEP_PRECISION)
     ) / STEP_PRECISION;
+}
+
+unsigned long lastTimeSend = 0;
+void setOutputByTime() {
+  setHueByTime();
+  setBrightnessByTime();
   if(millis() - lastTimeSend > 1000){
     broadcastCurrentState(0);
     lastTimeSend = millis();
@@ -1001,6 +1018,7 @@ void setup() {
 // LOOP
 //*************************
 
+unsigned long turnedOffAt = 0;
 void loop() {
   ArduinoOTA.handle(); // listen for OTA Updates
   webSocket.loop(); // listen for websocket events
@@ -1012,18 +1030,28 @@ void loop() {
   #endif
 
   switch (currentState) {
-    case STATE_OFF:
-    case STATE_MANUAL: {
-        setOutput(currentOutput);
-        brightness = getBrightness(currentOutput);
-        if(brightness > 0){
-          hue = getHue(currentOutput);
+    case STATE_OFF: {
+        setOutput(OFF);
+        brightness = BRIGHTNESS_MIN;
+        if(prevState != STATE_OFF){
+          turnedOffAt = millis();
+        }
+
+        if((millis() - turnedOffAt) > HUE_RESET_TIMEOUT) {
+          setHueByTime();
         }
       }
       break;
+    case STATE_MANUAL: {
+        setOutput(currentOutput);
+        brightness = getBrightness(currentOutput);
+        hue = getHue(currentOutput);
+      }
+      break;
     case STATE_TIME: {
-        setByTime();
+        setOutputByTime();
       }
       break;
   }
+  prevState = currentState;
 }
