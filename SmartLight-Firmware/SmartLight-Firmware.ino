@@ -769,7 +769,7 @@ float getBrightness(Channels ch) {
       delay(min(debounceDuration, (unsigned long)5));
     } while(millis() - touchStart < debounceDuration);
     return (match >= noMatch * 2);
-  
+
   }
 
   bool waitForBtn(int ms, bool state = TOUCHED) {
@@ -862,8 +862,6 @@ float getBrightness(Channels ch) {
     bool currently_pressed = !ss.digitalRead(SS_SWITCH);
 
     int rotation_diff = prev_position - current_position;
-
-  
     if(rotation_diff < -MAX_STEPS_PER_TICK || rotation_diff > MAX_STEPS_PER_TICK){
       // read some unrealistic values - sometimes the rotary encoder goes crazy
       return;
@@ -873,7 +871,6 @@ float getBrightness(Channels ch) {
 
     bool isReleasing = prev_pressed && !currently_pressed;
     if(isReleasing && !rotationSincePushStart){
-      // toggle power state
       if(currentState == STATE_OFF){
         currentState = STATE_TIME;
       }else{
@@ -885,6 +882,9 @@ float getBrightness(Channels ch) {
       prev_position = current_position;
       rotationSincePushStart = false;
       return;
+    }
+    if(!currently_pressed){
+      rotationSincePushStart = false;
     }
     prev_pressed = currently_pressed;
 
@@ -909,10 +909,11 @@ float getBrightness(Channels ch) {
 
 
     #ifdef DEBUG
-      String message = 
+      String message =
         "prev:" +  String(prev_position) +
         ", current:" + String(current_position) +
         ", diff:" + String(rotation_diff) +
+        ", prev_pressed:" + String(prev_pressed) +
         ", pressed:" + String(currently_pressed) +
         ", hue:" + String((byte)(hue * 100)) +
         ", brightness:" + String(brightness);
