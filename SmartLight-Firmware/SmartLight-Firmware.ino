@@ -848,6 +848,7 @@ float getBrightness(Channels ch) {
         currentState = getStateByColor(currentOutput);
       }
       waitForBtn(TIMEOUT_INFINITY, RELEASED);
+      broadcastCurrentState(0);
     }
   }
 #endif
