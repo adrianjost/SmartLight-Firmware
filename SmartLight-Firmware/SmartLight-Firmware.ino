@@ -877,8 +877,9 @@ float getBrightness(Channels ch) {
         currentState = STATE_TIME;
       }else{
         brightness = BRIGHTNESS_MIN;
-        updateLED();
         currentState = STATE_OFF;
+        updateLED();
+        broadcastCurrentState(0);
       }
       prev_pressed = currently_pressed; // false
       prev_position = current_position;
@@ -908,6 +909,7 @@ float getBrightness(Channels ch) {
     }
     currentState = brightness == BRIGHTNESS_MIN ? STATE_OFF : STATE_MANUAL;
     updateLED();
+    broadcastCurrentState(0);
 
 
     #ifdef DEBUG
