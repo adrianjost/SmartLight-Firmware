@@ -169,3 +169,31 @@ Updates the saved Connection configuration.
 ## OTA Updates
 
 You can update the firmware using OTA-Updates (Over-The-Air Updates) so you don't need to connect the device physically to your PC. The [ArduinoOTA-Package](https://github.com/jandrassy/ArduinoOTA) is used for this, so please refer to [this documentation how to setup this update process](https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html#arduino-ide). If you are prompted for the device password, please use the WiFi password from the WiFi the device is connected to.
+
+## Board Pinouts
+
+### SmartLight V3.1
+
+Module: https://github.com/adrianjost/SmartLight-Hardware
+
+Label | Pin
+--- | ---
+WW/IO1 | 1
+CW/IO3 | 3
+GPIO2 | 2
+
+### H801 (recommended)
+
+Module: https://www.amazon.de/gp/product/B098WNS6QH/
+
+Label | PIN | Description
+--- | --- | ---
+R | 12 | Red Output Channel
+G | 13 | Green Output Channel
+B | 15 | Blue Output Channel
+WW | 14/4? | Warm-White Output Channel
+CW | 14/4? | Cold-White Output Channel
+RX | 2 | Programming Pin
+TX | 3 | Programming Pin
+D1 | 5 | Internal LED (red)
+D2 | 1 | Internal LED (green)

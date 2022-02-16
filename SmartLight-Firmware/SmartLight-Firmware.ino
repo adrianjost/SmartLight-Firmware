@@ -16,12 +16,13 @@ Date: 7 June 2020
   #define RELEASED false
 #endif
 
-#define PIN_CH1 2
-#define PIN_CH2 3
+#define PIN_CH1 13
+#define PIN_CH2 15
 
 #ifdef FEATURE_ROTARY
-  #define PIN_SDA 0
-  #define PIN_SCK 1
+  #define PIN_SDA 2
+  #define PIN_SCK 3
+  // #define FEATURE_ROTARY_NEOPIXEL
 #endif
 
 // // rotary setup
@@ -96,7 +97,9 @@ Date: 7 June 2020
   // Adafruit Rotary Encoder
   #include <Wire.h>
   #include "Adafruit_seesaw.h"
-  #include <seesaw_neopixel.h>
+  #ifdef FEATURE_ROTARY_NEOPIXEL
+    #include <seesaw_neopixel.h>
+  #endif
 #endif
 
 
@@ -116,8 +119,11 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
 #ifdef FEATURE_ROTARY
-  Adafruit_seesaw ss;
-  seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
+  Adafruit_seesaw ss(&Wire);
+  #ifdef FEATURE_ROTARY_NEOPIXEL
+    seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800, &Wire);
+  #endif
+  bool encoderSetup = false;
   int32_t prev_position;
 #endif
 
@@ -197,6 +203,13 @@ void setOutput(Channels ch){
   #endif
   #ifdef PIN_CH2
     analogWrite(PIN_CH2, ch.b);
+  #endif
+   #ifdef FEATURE_ROTARY_NEOPIXEL
+    if(encoderSetup == true){
+      sspixel.setBrightness(255);
+      sspixel.setPixelColor(0, sspixel.Color(ch.a, min(ch.a, ch.b), ch.b));
+      sspixel.show();
+    }
   #endif
 }
 
@@ -673,15 +686,21 @@ void setupWebsocket(){
 }
 
 #ifdef FEATURE_ROTARY
-  bool encoderSetup = 0;
   void setupRotary(){
-    if (! ss.begin(SEESAW_ADDR) || ! sspixel.begin(SEESAW_ADDR)) {
+    if (! ss.begin(SEESAW_ADDR) ) {
       // Couldn't find seesaw on default address
       blink(ON, 3, 300);
       return;
-    } else {
-      encoderSetup = 1;
     }
+    #ifdef FEATURE_ROTARY_NEOPIXEL
+      if (! sspixel.begin(SEESAW_ADDR)) {
+        // Couldn't find seesaw on default address
+        blink(ON, 5, 300);
+        return;
+      }
+    #endif
+
+    encoderSetup = true;
 
     uint32_t version = ((ss.getVersion() >> 16) & 0xFFFF);
     if (version != 4991){
@@ -694,9 +713,10 @@ void setupWebsocket(){
     prev_position = ss.getEncoderPosition();
 
     ss.pinMode(SS_SWITCH, INPUT_PULLUP);
-
-    sspixel.setBrightness(0);
-    sspixel.show();
+    #ifdef FEATURE_ROTARY_NEOPIXEL
+      sspixel.setBrightness(0);
+      sspixel.show();
+    #endif
   }
 #endif
 
@@ -857,14 +877,14 @@ float getBrightness(Channels ch) {
   bool prev_pressed = false;
   bool rotationSincePushStart = false;
   void handleRotary(){
-    if(encoderSetup == 0){
+    if(encoderSetup == false){
       // skip to prevent crashing other parts
       return;
     }
-    int current_position = ss.getEncoderPosition();
+    int32_t current_position = ss.getEncoderPosition();
     bool currently_pressed = !ss.digitalRead(SS_SWITCH);
 
-    int rotation_diff = prev_position - current_position;
+    int32_t rotation_diff = prev_position - current_position;
     if(rotation_diff < -MAX_STEPS_PER_TICK || rotation_diff > MAX_STEPS_PER_TICK){
       // read some unrealistic values - sometimes the rotary encoder goes crazy
       return;
@@ -923,10 +943,6 @@ float getBrightness(Channels ch) {
         ", hue:" + String((byte)(hue * 100)) +
         ", brightness:" + String(brightness);
       webSocket.broadcastTXT(message);
-
-      sspixel.setBrightness(brightness);
-      sspixel.setPixelColor(0, sspixel.Color(currentOutput.a, 0, currentOutput.b));
-      sspixel.show();
     #endif
     prev_position = current_position;
   }
@@ -1005,6 +1021,8 @@ void setup() {
   #endif
 
   initStrip();
+
+  delay(1000);
 
   blink(ON, 1, 300);
   setupWifi();
