@@ -176,6 +176,7 @@ void initStrip(){
     Serial.println("initStrip");
   #endif
 
+  analogWriteFreq(20000); // increase frequency to reduce board coil whine
   #ifdef PIN_CH1
     pinMode(PIN_CH1, OUTPUT);
   #endif
