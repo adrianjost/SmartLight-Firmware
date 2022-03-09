@@ -124,7 +124,6 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
     seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800, &Wire);
   #endif
   bool encoderSetup = false;
-  int32_t prev_position;
 #endif
 
 // JSON sizes https://arduinojson.org/v6/assistant/
@@ -711,8 +710,6 @@ void setupWebsocket(){
     }
 
     // get starting position
-    prev_position = ss.getEncoderPosition();
-
     ss.pinMode(SS_SWITCH, INPUT_PULLUP);
     #ifdef FEATURE_ROTARY_NEOPIXEL
       sspixel.setBrightness(0);
@@ -882,10 +879,9 @@ float getBrightness(Channels ch) {
       // skip to prevent crashing other parts
       return;
     }
-    int32_t current_position = ss.getEncoderPosition();
     bool currently_pressed = !ss.digitalRead(SS_SWITCH);
 
-    int32_t rotation_diff = prev_position - current_position;
+    int32_t rotation_diff = ss.getEncoderDelta();
     if(rotation_diff < -MAX_STEPS_PER_TICK || rotation_diff > MAX_STEPS_PER_TICK){
       // read some unrealistic values - sometimes the rotary encoder goes crazy
       return;
@@ -904,7 +900,6 @@ float getBrightness(Channels ch) {
         broadcastCurrentState(0);
       }
       prev_pressed = currently_pressed; // false
-      prev_position = current_position;
       rotationSincePushStart = false;
       return;
     }
@@ -913,18 +908,18 @@ float getBrightness(Channels ch) {
     }
     prev_pressed = currently_pressed;
 
-    if (prev_position == current_position) {
+    if (rotation_diff == 0) {
       return;
     }
     if(currently_pressed){
       hue = constrain(
-        (float)hue - ((float)rotation_diff * HUE_STEP),
+        (float)hue + ((float)rotation_diff * HUE_STEP),
         HUE_MIN,
         HUE_MAX
       );
     }else{
       brightness = constrain(
-        brightness + (rotation_diff * BRIGHTNESS_STEP),
+        brightness - (rotation_diff * BRIGHTNESS_STEP),
         BRIGHTNESS_MIN,
         BRIGHTNESS_MAX
       );
@@ -936,16 +931,13 @@ float getBrightness(Channels ch) {
 
     #ifdef DEBUG
       String message =
-        "prev:" +  String(prev_position) +
-        ", current:" + String(current_position) +
-        ", diff:" + String(rotation_diff) +
+        "delta:" + String(rotation_diff) +
         ", prev_pressed:" + String(prev_pressed) +
         ", pressed:" + String(currently_pressed) +
         ", hue:" + String((byte)(hue * 100)) +
         ", brightness:" + String(brightness);
       webSocket.broadcastTXT(message);
     #endif
-    prev_position = current_position;
   }
 #endif
 
