@@ -60,14 +60,15 @@ Date: 7 June 2020
 
 // rotary control
 #ifdef FEATURE_ROTARY
-  #define BRIGHTNESS_STEP 5
+  #define BRIGHTNESS_STEP 10
   #define HUE_STEP 0.05
   #define MAX_STEPS_PER_TICK 1
 #endif
 
 // control steps
 #define BRIGHTNESS_MIN 0
-#define BRIGHTNESS_MAX 255
+#define BRIGHTNESS_MAX 1023
+#define BRIGHTNESS_API_SCALE_FACTOR 4
 
 #define HUE_MIN 0.0
 #define HUE_MAX 1.0
@@ -134,8 +135,8 @@ const size_t maxTimeConfigSize = 2*JSON_ARRAY_SIZE(24) + JSON_OBJECT_SIZE(2) + J
 const size_t maxPayloadSize = maxTimeConfigSize;
 
 struct Channels {
-  byte a;
-  byte b;
+  int a;
+  int b;
 };
 
 struct FloatChannels {
@@ -158,8 +159,8 @@ byte currentState = STATE_OFF;
 Channels currentOutput {0,0};
 
 // currentState == STATE_TIME
-byte brightness = 0;
-float hue = 0.5;
+int brightness = 0;
+float hue = 0.500;
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
 byte time_brightness[24] = {1,1,3,5,13,51,128,204,230,255,255,255,255,255,255,255,255,255,180,100,40,25,15,3};
 byte time_hue[24] = {0,0,0,2,5,10,20,40,50,60,70,70,70,70,70,70,70,50,30,20,0,0,0,0};
@@ -175,6 +176,7 @@ void initStrip(){
     Serial.println("initStrip");
   #endif
 
+  analogWriteRange(1023); // increase precision of PWM
   analogWriteFreq(20000); // increase frequency to reduce board coil whine
   #ifdef PIN_CH1
     pinMode(PIN_CH1, OUTPUT);
@@ -499,8 +501,8 @@ void broadcastCurrentState(unsigned int messageID) {
   }
   String message = "{\"action\":\"GET /output\",\"id\":" + String(messageID) +
     ",\"data\":{\"channel\":[" +
-      String(currentOutput.a) + "," + String(currentOutput.b) +
-    "],\"brightness\":" + String(brightness) +
+      String((byte)(currentOutput.a / BRIGHTNESS_API_SCALE_FACTOR)) + "," + String((byte)(currentOutput.b / BRIGHTNESS_API_SCALE_FACTOR)) +
+    "],\"brightness\":" + String((byte)(brightness / BRIGHTNESS_API_SCALE_FACTOR)) +
     ",\"ratio\":" + String((byte)(hue * 100)) +
     ",\"power\":" + ((currentOutput.a == 0 && currentOutput.b == 0) ? "false" : "true") +
     ",\"time\":\"" + String((timeClient.getHours() + time_utc_offset) % 24) + ":" + String(timeClient.getMinutes() % 60) +
@@ -559,16 +561,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
         } else if (action == "SET /output/channel") {
           currentOutput = {
-            (byte)doc["data"][0],
-            (byte)doc["data"][1]
+            (byte)doc["data"][0] * BRIGHTNESS_API_SCALE_FACTOR,
+            (byte)doc["data"][1] * BRIGHTNESS_API_SCALE_FACTOR
           };
           currentState = getStateByColor(currentOutput);
           sendOK(num, messageID);
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/channel") {
           String message = "{\"action\":\"GET /output/channel\",\"data\":[" +
-            String(currentOutput.a) + "," +
-            String(currentOutput.b) + "]}";
+            String((byte)(currentOutput.a / BRIGHTNESS_API_SCALE_FACTOR)) + "," +
+            String((byte)(currentOutput.b / BRIGHTNESS_API_SCALE_FACTOR)) + "]}";
           webSocket.sendTXT(num, message);
 
 
@@ -603,18 +605,18 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
 
         } else if (action == "SET /output/brightness") {
-          brightness = (byte)doc["data"];
+          brightness = (byte)doc["data"] * BRIGHTNESS_API_SCALE_FACTOR;
           updateLED();
           currentState = getStateByColor(currentOutput);
           sendOK(num, messageID);
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/brightness") {
-          String message = "{\"action\":\"GET /output/brightness\",\"id\":" + String(messageID) + ",\"data\":" + String(brightness) + "}";
+          String message = "{\"action\":\"GET /output/brightness\",\"id\":" + String(messageID) + ",\"data\":" + String((byte)(brightness / BRIGHTNESS_API_SCALE_FACTOR)) + "}";
           webSocket.sendTXT(num, message);
 
 
         } else if (action == "SET /output/brightness-and-ratio") {
-          brightness = (byte)doc["data"][0];
+          brightness = (byte)doc["data"][0] * BRIGHTNESS_API_SCALE_FACTOR;
           hue = (byte)doc["data"][1] / 100.0;
           updateLED();
           currentState = getStateByColor(currentOutput);
@@ -622,7 +624,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           broadcastCurrentState(messageID);
         } else if (action == "GET /output/brightness-and-ratio") {
           String message = "{\"action\":\"GET /output/brightness-and-ratio\",\"id\":" + String(messageID) + ",\"data\":["
-            + String(brightness) + ","
+            + String((byte)(brightness / BRIGHTNESS_API_SCALE_FACTOR)) + ","
             + String((byte)(hue * 100))
           + "]}";
           webSocket.sendTXT(num, message);
@@ -724,8 +726,8 @@ void setupWebsocket(){
 
 Channels floatChtoCh(FloatChannels color){
   return Channels {
-    (byte)color.a,
-    (byte)color.b,
+    (int)color.a,
+    (int)color.b,
   };
 }
 
@@ -958,7 +960,13 @@ void setBrightnessByTime() {
   maybeUpdateTime();
   byte minutes = timeClient.getMinutes() % 60;
   byte hour = (timeClient.getHours() + time_utc_offset) % 24;
-  brightness = map(minutes, 0, 60, time_brightness[(hour) % 24], time_brightness[(hour + 1) % 24]);
+  brightness = map(
+    minutes, 
+    0,
+    60,
+    time_brightness[(hour) % 24] * BRIGHTNESS_API_SCALE_FACTOR,
+    time_brightness[(hour + 1) % 24] * BRIGHTNESS_API_SCALE_FACTOR
+  );
 }
 
 void setHueByTime() {
