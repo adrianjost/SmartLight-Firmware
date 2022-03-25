@@ -984,7 +984,7 @@ unsigned long lastTimeSend = 0;
 void setOutputByTime() {
   setHueByTime();
   setBrightnessByTime();
-  if(millis() - lastTimeSend > 1000){
+  if(millis() - lastTimeSend > 60000){
     broadcastCurrentState(0);
     lastTimeSend = millis();
   }
